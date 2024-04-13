@@ -1,15 +1,23 @@
 import string
+from pathlib import Path
+
 import wx
 
-from acquisition.abstract import Parameters
+from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
 
 METHODS = [AsrMethod(), RsyncMethod()]
 PARAMS = Parameters()
 
+INPUT_WINDOW: "InputWindow"
+OVERVIEW_WINDOW: "OverviewWindow"
+PROCESSING_WINDOW: wx.Frame
+
 
 class InputWindow(wx.Frame):
+    method: AcquisitionMethod
+
     def __init__(self):
         super().__init__(
             parent=None,
@@ -113,12 +121,81 @@ class InputWindow(wx.Frame):
             return False
 
     def on_continue(self, event):
-        # Validate input and proceed to the next window
+        PARAMS.case = self.case_text.Value
+        PARAMS.examiner = self.examiner_text.Value
+        PARAMS.notes = self.notes_text.Value
+        PARAMS.source = Path(self.source_picker.GetPath())
+        PARAMS.tmp = Path(self.tmp_picker.GetPath())
+        PARAMS.destination = Path(self.destination_picker.GetPath())
+        self.method = METHODS[self.method_choice.GetSelection()]
+
+        self.Hide()
+        OVERVIEW_WINDOW.update_overview()
+        OVERVIEW_WINDOW.Show()
+
+
+class OverviewWindow(wx.Frame):
+    def __init__(self):
+        super().__init__(
+            parent=None,
+            title="Fuji - Overview",
+            size=(600, 400),
+        )
+        panel = wx.Panel(self)
+
+        # Components
+        title = wx.StaticText(panel, label="Acquisition Overview")
+        title_font = wx.Font(
+            18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
+        )
+        title.SetFont(title_font)
+        self.overview_text = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
+
+        # Buttons
+        back_btn = wx.Button(panel, label="Back")
+        back_btn.Bind(wx.EVT_BUTTON, self.on_back)
+        confirm_btn = wx.Button(panel, label="Confirm")
+        confirm_btn.Bind(wx.EVT_BUTTON, self.on_confirm)
+
+        # Layout
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox.Add(title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
+        vbox.Add((0, 10))
+        vbox.Add(self.overview_text, 1, wx.EXPAND | wx.ALL, 10)
+        vbox.Add((0, 20))
+        hbox = wx.BoxSizer(wx.HORIZONTAL)
+        hbox.Add(back_btn, 0, wx.RIGHT, 10)
+        hbox.Add(confirm_btn, 0)
+        vbox.Add(hbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
+
+        panel.SetSizer(vbox)
+
+    def update_overview(self):
+        overview = f"Case name: {PARAMS.case}\n"
+        overview += f"Examiner: {PARAMS.examiner}\n"
+        overview += f"Notes: {PARAMS.notes}\n"
+        overview += f"Source device: {PARAMS.source}\n"
+        overview += f"Temporary image location: {PARAMS.tmp}\n"
+        overview += f"DMG destination: {PARAMS.destination}\n"
+        overview += f"Acquisition method: {INPUT_WINDOW.method.name}\n"
+
+        self.overview_text.SetValue(overview)
+
+    def on_back(self, event):
+        # Hide the overview window and show the input window again
+        self.Hide()
+        input_win = InputWindow()
+        input_win.Show()
+
+    def on_confirm(self, event):
+        # Proceed to the final window
         pass
 
 
 if __name__ == "__main__":
     app = wx.App()
-    input_win = InputWindow()
-    input_win.Show()
+    INPUT_WINDOW = InputWindow()
+    OVERVIEW_WINDOW = OverviewWindow()
+
+    INPUT_WINDOW.Show()
     app.MainLoop()
