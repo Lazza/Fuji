@@ -1,4 +1,7 @@
+import os
 import string
+import sys
+import threading
 from pathlib import Path
 
 import wx
@@ -13,6 +16,21 @@ PARAMS = Parameters()
 INPUT_WINDOW: "InputWindow"
 OVERVIEW_WINDOW: "OverviewWindow"
 PROCESSING_WINDOW: wx.Frame
+
+
+def terminate(app: wx.App):
+    INPUT_WINDOW.Destroy()
+    OVERVIEW_WINDOW.Destroy()
+    PROCESSING_WINDOW.Destroy()
+    app.ExitMainLoop()
+
+
+class RedirectText(object):
+    def __init__(self, control: wx.TextCtrl):
+        self.out = control
+
+    def write(self, value):
+        wx.CallAfter(self.out.AppendText, value)
 
 
 class InputWindow(wx.Frame):
@@ -41,8 +59,8 @@ class InputWindow(wx.Frame):
         notes_label = wx.StaticText(panel, label="Notes:")
         self.notes_text = wx.TextCtrl(panel, value=PARAMS.notes)
 
-        output_label = wx.StaticText(panel, label="Output name:")
-        self.output_text = wx.TextCtrl(panel, value="FujiAcquisition")
+        output_label = wx.StaticText(panel, label="Image name:")
+        self.output_text = wx.TextCtrl(panel, value=PARAMS.image_name)
         self.output_text.Bind(wx.EVT_CHAR, self._validate_image_name)
         source_label = wx.StaticText(panel, label="Source device:")
         self.source_picker = wx.DirPickerCtrl(panel, path="/")
@@ -124,6 +142,7 @@ class InputWindow(wx.Frame):
         PARAMS.case = self.case_text.Value
         PARAMS.examiner = self.examiner_text.Value
         PARAMS.notes = self.notes_text.Value
+        PARAMS.image_name = self.output_text.Value
         PARAMS.source = Path(self.source_picker.GetPath())
         PARAMS.tmp = Path(self.tmp_picker.GetPath())
         PARAMS.destination = Path(self.destination_picker.GetPath())
@@ -184,18 +203,89 @@ class OverviewWindow(wx.Frame):
     def on_back(self, event):
         # Hide the overview window and show the input window again
         self.Hide()
-        input_win = InputWindow()
-        input_win.Show()
+        INPUT_WINDOW.Show()
 
     def on_confirm(self, event):
-        # Proceed to the final window
-        pass
+        # Start acquisition
+        self.Hide()
+        PROCESSING_WINDOW.activate()
+
+    def onClose(self, event):
+        self.on_back(self, event)
+
+
+class ProcessingWindow(wx.Frame):
+    def __init__(self):
+        super().__init__(
+            parent=None,
+            title="Fuji - Acquisition",
+            size=(800, 600),
+        )
+        self.panel = wx.Panel(self)
+
+        # Components
+        self.title = wx.StaticText(self.panel, label="Acquisition in progress")
+        self.title_font = wx.Font(
+            14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
+        )
+        self.title.SetFont(self.title_font)
+        self.output_text = wx.TextCtrl(
+            self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL | wx.VSCROLL
+        )
+
+        # Layout
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox.Add(self.title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
+        vbox.Add(self.output_text, 1, wx.EXPAND | wx.ALL, 10)
+
+        self.panel.SetSizer(vbox)
+
+    def activate(self):
+        self.Show()
+
+        # Redirect sys.stdout to the custom file-like object
+        redir = RedirectText(self.output_text)
+        sys.stdout = redir
+        sys.stderr = redir
+
+        # Start acquisition process in a separate thread
+        self.acquisition_thread = threading.Thread(target=self.execute_acquisition)
+        self.acquisition_thread.start()
+
+    def execute_acquisition(self):
+        try:
+            method = INPUT_WINDOW.method
+            result = method.execute(PARAMS)
+
+            # Process ended
+            wx.CallAfter(self.set_completion_status, result)
+
+        except Exception as e:
+            # Acquisition failed
+            wx.CallAfter(self.set_completion_status, False)
+            wx.CallAfter(sys.stdout.write, f"Error: {str(e)}\n")
+
+    def set_completion_status(self, success):
+        if success:
+            self.title.SetLabel("Acquisition completed")
+            self.title.SetForegroundColour((20, 240, 20))
+            self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
+        else:
+            self.title.SetLabel("Acquisition failed")
+            self.title.SetForegroundColour((240, 20, 20))
+            self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
+        self.title.SetFont(self.title_font)
+
+    def onClose(self, event):
+        # Restore original sys.stdout
+        terminate(app)
 
 
 if __name__ == "__main__":
     app = wx.App()
     INPUT_WINDOW = InputWindow()
     OVERVIEW_WINDOW = OverviewWindow()
+    PROCESSING_WINDOW = ProcessingWindow()
 
     INPUT_WINDOW.Show()
     app.MainLoop()
