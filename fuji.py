@@ -18,13 +18,6 @@ OVERVIEW_WINDOW: "OverviewWindow"
 PROCESSING_WINDOW: wx.Frame
 
 
-def terminate(app: wx.App):
-    INPUT_WINDOW.Destroy()
-    OVERVIEW_WINDOW.Destroy()
-    PROCESSING_WINDOW.Destroy()
-    app.ExitMainLoop()
-
-
 class RedirectText(object):
     def __init__(self, control: wx.TextCtrl):
         self.out = control
@@ -128,6 +121,9 @@ class InputWindow(wx.Frame):
         sizer.Add(panel)
         self.SetSizerAndFit(sizer)
 
+        # Bind close
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
         valid_characters = "-_" + string.ascii_letters + string.digits
@@ -151,6 +147,10 @@ class InputWindow(wx.Frame):
         self.Hide()
         OVERVIEW_WINDOW.update_overview()
         OVERVIEW_WINDOW.Show()
+
+    def on_close(self, event):
+        app: wx.App = wx.GetApp()
+        app.ExitMainLoop()
 
 
 class OverviewWindow(wx.Frame):
@@ -189,6 +189,9 @@ class OverviewWindow(wx.Frame):
 
         panel.SetSizer(vbox)
 
+        # Bind close
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
     def update_overview(self):
         overview = f"Case name: {PARAMS.case}\n"
         overview += f"Examiner: {PARAMS.examiner}\n"
@@ -210,8 +213,8 @@ class OverviewWindow(wx.Frame):
         self.Hide()
         PROCESSING_WINDOW.activate()
 
-    def onClose(self, event):
-        self.on_back(self, event)
+    def on_close(self, event):
+        self.on_back(event)
 
 
 class ProcessingWindow(wx.Frame):
@@ -240,6 +243,10 @@ class ProcessingWindow(wx.Frame):
 
         self.panel.SetSizer(vbox)
 
+        # Bind close
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+        self.running = True
+
     def activate(self):
         self.Show()
 
@@ -258,7 +265,7 @@ class ProcessingWindow(wx.Frame):
             result = method.execute(PARAMS)
 
             # Process ended
-            wx.CallAfter(self.set_completion_status, result)
+            wx.CallAfter(self.set_completion_status, result.success)
 
         except Exception as e:
             # Acquisition failed
@@ -275,10 +282,12 @@ class ProcessingWindow(wx.Frame):
             self.title.SetForegroundColour((240, 20, 20))
             self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         self.title.SetFont(self.title_font)
+        self.running = False
 
-    def onClose(self, event):
-        # Restore original sys.stdout
-        terminate(app)
+    def on_close(self, event):
+        if not self.running:
+            app: wx.App = wx.GetApp()
+            app.ExitMainLoop()
 
 
 if __name__ == "__main__":
