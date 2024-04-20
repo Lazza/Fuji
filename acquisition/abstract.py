@@ -256,6 +256,8 @@ class AcquisitionMethod(ABC):
                     separator,
                     f"Start time: {report.start_time}",
                     f"End time: {report.end_time}",
+                    f"Source: {report.parameters.source}",
+                    f"Acquisition method: {report.method.name}",
                     separator,
                     report.hardware_info,
                     separator,
