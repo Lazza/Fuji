@@ -168,7 +168,9 @@ class OverviewWindow(wx.Frame):
             18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
         )
         title.SetFont(title_font)
-        self.overview_text = wx.TextCtrl(panel, style=wx.TE_MULTILINE | wx.TE_READONLY)
+        self.overview_text = wx.TextCtrl(
+            panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
+        )
 
         # Buttons
         back_btn = wx.Button(panel, label="Back")
@@ -233,7 +235,7 @@ class ProcessingWindow(wx.Frame):
         )
         self.title.SetFont(self.title_font)
         self.output_text = wx.TextCtrl(
-            self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.HSCROLL | wx.VSCROLL
+            self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
         )
 
         # Layout

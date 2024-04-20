@@ -226,8 +226,6 @@ class AcquisitionMethod(ABC):
                 percent = 100 * amount // total_size
                 if percent > last_percent:
                     print(f"{percent}% ", end="")
-                    if percent % 20 == 0:
-                        print("")
                     last_percent = percent
 
         result = HashedFile(
