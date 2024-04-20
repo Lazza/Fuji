@@ -212,21 +212,33 @@ class AcquisitionMethod(ABC):
         sha256 = hashlib.sha256()
         md5 = hashlib.md5()
 
-        with open(path, "rb") as f:
-            while True:
-                chunk = f.read(chunk_size)
-                if not chunk:
-                    print("")
-                    break
-                sha1.update(chunk)
-                sha256.update(chunk)
-                md5.update(chunk)
+        # The process needs to be caffeinated manually, because the hashing
+        # function is done directly via our Python code. We start a caffeinate
+        # instance with a very long duration (7 days) and terminate after the
+        # process is completed.
 
-                amount = amount + chunk_size
-                percent = 100 * amount // total_size
-                if percent > last_percent:
-                    print(f"{percent}% ", end="")
-                    last_percent = percent
+        one_week = 60 * 60 * 24 * 7
+        coffee = subprocess.Popen(["caffeinate", "-dimsu", "-t", f"{one_week}"])
+
+        try:
+            with open(path, "rb") as f:
+                while True:
+                    chunk = f.read(chunk_size)
+                    if not chunk:
+                        print("")
+                        break
+                    sha1.update(chunk)
+                    sha256.update(chunk)
+                    md5.update(chunk)
+
+                    amount = amount + chunk_size
+                    percent = 100 * amount // total_size
+                    if percent > last_percent:
+                        print(f"{percent}% ", end="")
+                        last_percent = percent
+        finally:
+            coffee.terminate()
+            coffee.communicate()
 
         result = HashedFile(
             path, md5=md5.hexdigest(), sha1=sha1.hexdigest(), sha256=sha256.hexdigest()
