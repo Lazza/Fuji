@@ -15,7 +15,7 @@ PARAMS = Parameters()
 
 INPUT_WINDOW: "InputWindow"
 OVERVIEW_WINDOW: "OverviewWindow"
-PROCESSING_WINDOW: wx.Frame
+PROCESSING_WINDOW: "ProcessingWindow"
 
 
 class RedirectText(object):
@@ -55,7 +55,7 @@ class InputWindow(wx.Frame):
         output_label = wx.StaticText(panel, label="Image name:")
         self.output_text = wx.TextCtrl(panel, value=PARAMS.image_name)
         self.output_text.Bind(wx.EVT_CHAR, self._validate_image_name)
-        source_label = wx.StaticText(panel, label="Source device:")
+        source_label = wx.StaticText(panel, label="Source:")
         self.source_picker = wx.DirPickerCtrl(panel, path="/")
         tmp_label = wx.StaticText(panel, label="Temporary image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel, path="/Volumes/Fuji")
@@ -163,7 +163,7 @@ class OverviewWindow(wx.Frame):
         panel = wx.Panel(self)
 
         # Components
-        title = wx.StaticText(panel, label="Acquisition Overview")
+        title = wx.StaticText(panel, label="Acquisition overview")
         title_font = wx.Font(
             18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
         )
@@ -231,7 +231,7 @@ class ProcessingWindow(wx.Frame):
         # Components
         self.title = wx.StaticText(self.panel, label="Acquisition in progress")
         self.title_font = wx.Font(
-            14, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
+            18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
         )
         self.title.SetFont(self.title_font)
         self.output_text = wx.TextCtrl(
@@ -247,9 +247,16 @@ class ProcessingWindow(wx.Frame):
 
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
-        self.running = True
 
     def activate(self):
+        self.running = True
+
+        # Reset initial status
+        self.title.SetLabel("Acquisition in progress")
+        self.title.SetForegroundColour(wx.NullColour)
+        self.title.SetFont(self.title_font)
+        self.output_text.SetValue("")
+
         self.Show()
 
         # Redirect sys.stdout to the custom file-like object
@@ -278,18 +285,16 @@ class ProcessingWindow(wx.Frame):
         if success:
             self.title.SetLabel("Acquisition completed")
             self.title.SetForegroundColour((20, 240, 20))
-            self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         else:
             self.title.SetLabel("Acquisition failed")
             self.title.SetForegroundColour((240, 20, 20))
-            self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         self.title.SetFont(self.title_font)
         self.running = False
 
     def on_close(self, event):
         if not self.running:
-            app: wx.App = wx.GetApp()
-            app.ExitMainLoop()
+            self.Hide()
+            INPUT_WINDOW.Show()
 
 
 if __name__ == "__main__":
