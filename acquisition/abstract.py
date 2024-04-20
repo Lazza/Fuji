@@ -226,6 +226,8 @@ class AcquisitionMethod(ABC):
                 percent = 100 * amount // total_size
                 if percent > last_percent:
                     print(f"{percent}% ", end="")
+                    if percent % 20 == 0:
+                        print("")
                     last_percent = percent
 
         result = HashedFile(
@@ -243,7 +245,7 @@ class AcquisitionMethod(ABC):
 
         separator = "-" * 80
         with open(self.output_report, "w") as output:
-            output.writelines(
+            for line in (
                 [
                     "Fuji - Forensic Unattended Juicy Imaging",
                     "Acquisition log",
@@ -261,17 +263,18 @@ class AcquisitionMethod(ABC):
                     separator,
                     "Generated files:",
                 ]
-            )
-            output.writelines([f"    - {file}" for file in report.output_files])
-            output.writelines(
-                [
+                + [f"    - {file}" for file in report.output_files]
+                + [
                     separator,
                     f"Computed hashes ({report.result.path}):",
                     f"    - MD5: {report.result.md5}",
                     f"    - SHA1: {report.result.sha1}",
                     f"    - SHA256: {report.result.sha256}",
                 ]
-            )
+            ):
+                output.write(line + "\n")
+
+        print("\nAcquisition completed!")
 
     @abstractmethod
     def execute(self, params: Parameters) -> Report:
