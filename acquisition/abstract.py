@@ -167,6 +167,7 @@ class AcquisitionMethod(ABC):
         return success
 
     def _detach_temporary_image(self, delay=30, interval=10, attempts=3) -> bool:
+        print("\nWaiting to detach temporary image...")
         time.sleep(delay)
         result = False
 
