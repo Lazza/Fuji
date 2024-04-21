@@ -304,3 +304,4 @@ if __name__ == "__main__":
 
     INPUT_WINDOW.Show()
     app.MainLoop()
+    app.Destroy()
