@@ -158,7 +158,7 @@ class AcquisitionMethod(ABC):
             return False
 
         result, output = self._run_process(["hdiutil", "attach", image_path])
-        self.temporary_volume = output.strip().split(" ")[0]
+        self.temporary_volume = output.strip().split("\n")[-1].split(" ")[0]
 
         success = result == 0
         if success:
