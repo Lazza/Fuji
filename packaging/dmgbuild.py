@@ -6,8 +6,22 @@ project_directory = Path(os.getcwd())
 dist_directory = project_directory / "dist"
 pack_directory = project_directory / "packaging"
 
+# File names
+settings_file = "Full Disk Access Settings.url"
+fuji_app_file = "Fuji.app"
+license_file = "LICENSE.rtf"
+
 files = [
-    str(pack_directory / "Full Disk Access Settings.url"),
-    str(dist_directory / "Fuji.app"),
+    str(pack_directory / settings_file),
+    str(dist_directory / fuji_app_file),
+    str(pack_directory / license_file),
 ]
+icon_locations = {
+    settings_file: (100, 100),
+    fuji_app_file: (300, 100),
+    license_file: (500, 100),
+}
 badge_icon = str(pack_directory / "Fuji.icns")
+left_bottom_coordinates = (200, 300)
+width_height = (640, 480)
+window_rect = (left_bottom_coordinates, width_height)
