@@ -238,8 +238,7 @@ class AcquisitionMethod(ABC):
                         print(f"{percent}% ", end="")
                         last_percent = percent
         finally:
-            coffee.terminate()
-            coffee.communicate()
+            coffee.kill()
 
         result = HashedFile(
             path, md5=md5.hexdigest(), sha1=sha1.hexdigest(), sha256=sha256.hexdigest()

@@ -1,5 +1,4 @@
 from datetime import datetime
-import time
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
 
 
