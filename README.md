@@ -19,3 +19,20 @@ Please carefully follow the installation procedure:
 
 
 ## Usage
+
+1. Connect the destination drive to the target Mac computer
+2. Open the Fuji DMG and click on _Full Disk Access Settings.url_
+3. Drag the _Fuji.app_ file on the list of authorized apps and ensure the toggle
+   is enabled
+4. Run _Fuji.app_
+5. When prompted, insert the password for the administrator user
+
+
+## Development
+
+Fuji is developed as a Universal2 application using the **3.11.7 release** of
+Python from <https://python.org>.
+
+The DMG file can be built by using the included Pyinstaller script:
+
+    pyinstaller Fuji.spec
