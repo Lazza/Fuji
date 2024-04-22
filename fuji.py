@@ -33,7 +33,9 @@ class InputWindow(wx.Frame):
             parent=None,
             title="Fuji - Forensic Unattended Juicy Imaging",
             size=(600, 400),
+            style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
+        self.EnableMaximizeButton(False)
         panel = wx.Panel(self)
 
         # Components
