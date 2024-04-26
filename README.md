@@ -8,6 +8,8 @@ Fuji performs a so-called *live acquisition* (the computer must be turned on) of
 *logical* nature, i.e. it includes only existing files. The software generates a
 DMG file that can be imported in several digital forensics programs.
 
+It is released under the terms of the GNU General Public License (version 3).
+
 
 ## Drive preparation
 
