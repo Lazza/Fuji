@@ -28,23 +28,9 @@ class AsrMethod(AcquisitionMethod):
             "--noprompt",
             "--erase",
         ]
-        status, _ = self._run_process(command)
+        status, _ = self._run_process(command, buffer_size=1)
 
         if status != 0:
             return report
 
-        result = self._detach_temporary_image()
-        if not result:
-            return report
-
-        result = self._generate_dmg(report)
-        if not result:
-            return report
-
-        # Compute all hashes and mark report as done
-        report.result = self._compute_hashes(self.output_path)
-        report.success = True
-        report.end_time = datetime.now()
-
-        self._write_report(report)
-        return report
+        return self._dmg_and_hash(report)

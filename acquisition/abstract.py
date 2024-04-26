@@ -1,6 +1,7 @@
 from datetime import datetime
 import hashlib
 import os
+import re
 import subprocess
 from abc import ABC, abstractmethod
 import sys
@@ -27,6 +28,7 @@ class PathDetails:
     is_disk: bool = True
     disk_sectors: int = 0
     disk_device: str = ""
+    disk_parent: str = ""
     disk_identifier: int = 0
     disk_info: str = ""
 
@@ -58,6 +60,7 @@ class AcquisitionMethod(ABC):
 
     temporary_path: Path = None
     temporary_volume: str = None
+    temporary_mount: str = None
     output_path: Path = None
 
     def _run_silent(self, arguments: List[str], awake=True) -> Tuple[int, str]:
@@ -67,7 +70,9 @@ class AcquisitionMethod(ABC):
         p = subprocess.run(arguments, capture_output=True, universal_newlines=True)
         return p.returncode, p.stdout
 
-    def _run_process(self, arguments: List[str], awake=True) -> Tuple[int, str]:
+    def _run_process(
+        self, arguments: List[str], awake=True, buffer_size=None
+    ) -> Tuple[int, str]:
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
 
@@ -80,7 +85,10 @@ class AcquisitionMethod(ABC):
 
         output = ""
         while True:
-            out = p.stdout.read(1)
+            if buffer_size:
+                out = p.stdout.read(buffer_size)
+            else:
+                out = p.stdout.readline()
             sys.stdout.write(out)
             output = output + out
 
@@ -91,6 +99,12 @@ class AcquisitionMethod(ABC):
                 break
 
         return p.returncode, output
+
+    def _disk_from_device(self, device: str) -> str:
+        if not device.startswith("/dev/disk"):
+            return device
+        chunk = device[9:].split("s")[0]
+        return "/dev/disk" + chunk
 
     def _find_mount_point(self, path: Path) -> Path:
         path = os.path.realpath(path)
@@ -124,6 +138,7 @@ class AcquisitionMethod(ABC):
             is_disk=is_disk,
             disk_sectors=sectors,
             disk_device=disk_device,
+            disk_parent=self._disk_from_device(disk_device),
             disk_identifier=disk_identifier,
             disk_info=disk_info,
         )
@@ -158,7 +173,10 @@ class AcquisitionMethod(ABC):
             return False
 
         result, output = self._run_process(["hdiutil", "attach", image_path])
-        self.temporary_volume = output.strip().split("\n")[-1].split(" ")[0]
+        last_line = output.strip().split("\n")[-1]
+        parts = re.split("\s+", last_line, maxsplit=2)
+        self.temporary_volume = parts[0]
+        self.temporary_mount = parts[2]
 
         success = result == 0
         if success:
@@ -287,6 +305,23 @@ class AcquisitionMethod(ABC):
                 output.write(line + "\n")
 
         print("\nAcquisition completed!")
+
+    def _dmg_and_hash(self, report: Report) -> Report:
+        result = self._detach_temporary_image()
+        if not result:
+            return report
+
+        result = self._generate_dmg(report)
+        if not result:
+            return report
+
+        # Compute all hashes and mark report as done
+        report.result = self._compute_hashes(self.output_path)
+        report.success = True
+        report.end_time = datetime.now()
+
+        self._write_report(report)
+        return report
 
     @abstractmethod
     def execute(self, params: Parameters) -> Report:
