@@ -1,10 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import importlib
 import subprocess
+import sys
 from pathlib import Path
 from shutil import copy, move
 
-from meta import VERSION
+sys.path.insert(0, ".")
+meta = importlib.import_module("meta")
+
 
 a = Analysis(
     ["fuji.py"],
@@ -37,7 +41,6 @@ exe = EXE(
     target_arch="universal2",
     codesign_identity=None,
     entitlements_file=None,
-    version=VERSION,
     icon=["packaging/Fuji.icns"],
 )
 coll = COLLECT(
@@ -54,6 +57,7 @@ app = BUNDLE(
     name="Fuji.app",
     icon="./packaging/Fuji.icns",
     bundle_identifier="com.andrealazzarotto.fuji",
+    version=meta.VERSION,
 )
 
 executable_path = Path("./dist/Fuji.app/Contents/MacOS")
