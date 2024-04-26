@@ -10,6 +10,8 @@ from typing import List, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from meta import AUTHOR, VERSION
+
 
 @dataclass
 class Parameters:
@@ -276,6 +278,7 @@ class AcquisitionMethod(ABC):
             for line in (
                 [
                     "Fuji - Forensic Unattended Juicy Imaging",
+                    f"Version {VERSION} by {AUTHOR}",
                     "Acquisition log",
                     separator,
                     f"Case name: {report.parameters.case}",

@@ -4,10 +4,12 @@ import threading
 from pathlib import Path
 
 import wx
+import wx.lib.agw.hyperlink as hl
 
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
+from meta import AUTHOR, HOMEPAGE, VERSION
 
 METHODS = [AsrMethod(), RsyncMethod()]
 PARAMS = Parameters()
@@ -45,6 +47,17 @@ class InputWindow(wx.Frame):
         )
         title.SetFont(title_font)
         desc = wx.StaticText(panel, label="Forensic Unattended Juicy Imaging")
+        desc_font = wx.Font(
+            18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_MEDIUM
+        )
+        desc.SetFont(desc_font)
+
+        byline_text = wx.StaticText(panel, label=f"Version {VERSION} by {AUTHOR}")
+        byline_link = hl.HyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
+        accent = wx.Colour(181, 78, 78)
+        byline_link.SetColours(accent, accent, accent)
+        byline_link.SetBold(True)
+        byline_link.UpdateLink()
 
         case_label = wx.StaticText(panel, label="Case name:")
         self.case_text = wx.TextCtrl(panel, value=PARAMS.case)
@@ -82,6 +95,10 @@ class InputWindow(wx.Frame):
         vbox = wx.BoxSizer(wx.VERTICAL)
         vbox.Add(title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
         vbox.Add(desc, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 5)
+        vbox.Add((0, 10))
+
+        vbox.Add(byline_text, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 0)
+        vbox.Add(byline_link, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 5)
         vbox.Add((0, 20))
 
         # Create a FlexGridSizer for labels and text controls

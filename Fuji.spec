@@ -4,6 +4,8 @@ import subprocess
 from pathlib import Path
 from shutil import copy, move
 
+from meta import VERSION
+
 a = Analysis(
     ["fuji.py"],
     pathex=[],
@@ -35,6 +37,7 @@ exe = EXE(
     target_arch="universal2",
     codesign_identity=None,
     entitlements_file=None,
+    version=VERSION,
     icon=["packaging/Fuji.icns"],
 )
 coll = COLLECT(
