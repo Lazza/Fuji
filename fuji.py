@@ -21,11 +21,23 @@ PROCESSING_WINDOW: "ProcessingWindow"
 
 
 class RedirectText(object):
+    out: wx.TextCtrl
+    max_lines = 500
+
     def __init__(self, control: wx.TextCtrl):
         self.out = control
 
     def write(self, value):
-        wx.CallAfter(self.out.AppendText, value)
+        wx.CallAfter(self.append_shrink, value)
+
+    def append_shrink(self, value):
+        self.out.AppendText(value)
+        lines = self.out.GetNumberOfLines()
+        if lines > self.max_lines:
+            delta = lines - self.max_lines
+            position = self.out.XYToPosition(0, delta - 1)
+            self.out.Remove(0, position)
+        self.out.ShowPosition(self.out.GetLastPosition())
 
 
 class InputWindow(wx.Frame):

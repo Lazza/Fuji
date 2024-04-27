@@ -6,7 +6,7 @@ import subprocess
 from abc import ABC, abstractmethod
 import sys
 import time
-from typing import List, Tuple
+from typing import IO, List, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -66,6 +66,10 @@ class AcquisitionMethod(ABC):
     temporary_mount: str = None
     output_path: Path = None
 
+    def _limited_read(self, file: IO[str], limit: int, encoding: str) -> str:
+        data = os.read(file.fileno(), limit)
+        return data.decode(encoding)
+
     def _run_silent(self, arguments: List[str], awake=True) -> Tuple[int, str]:
         # Run a process silently. Return its status code and output.
         if awake:
@@ -75,7 +79,7 @@ class AcquisitionMethod(ABC):
         return p.returncode, p.stdout
 
     def _run_process(
-        self, arguments: List[str], awake=True, buffer_size=None
+        self, arguments: List[str], awake=True, buffer_size=1024000
     ) -> Tuple[int, str]:
         # Run a process in plain sight. Return its status code and output.
         if awake:
@@ -88,12 +92,12 @@ class AcquisitionMethod(ABC):
             universal_newlines=True,
         )
 
+        encoding = p.stdout.encoding
         output = ""
         while True:
-            if buffer_size:
-                out = p.stdout.read(buffer_size)
-            else:
-                out = p.stdout.readline()
+            # Let it breathe and avoid the UI getting stuck
+            time.sleep(0.05)
+            out = self._limited_read(p.stdout, buffer_size, encoding)
             sys.stdout.write(out)
             output = output + out
 
@@ -105,7 +109,7 @@ class AcquisitionMethod(ABC):
 
         return p.returncode, output
 
-    def _run_status(self, arguments: List[str], awake=True, buffer_size=None) -> int:
+    def _run_status(self, arguments: List[str], awake=True, buffer_size=1024000) -> int:
         # Run a process in plain sight. Return its status code.
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
@@ -117,11 +121,11 @@ class AcquisitionMethod(ABC):
             universal_newlines=True,
         )
 
+        encoding = p.stdout.encoding
         while True:
-            if buffer_size:
-                out = p.stdout.read(buffer_size)
-            else:
-                out = p.stdout.readline()
+            # Let it breathe and avoid the UI getting stuck
+            time.sleep(0.05)
+            out = self._limited_read(p.stdout, buffer_size, encoding)
             sys.stdout.write(out)
 
             if p.poll() != None:
