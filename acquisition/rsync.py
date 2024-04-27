@@ -58,7 +58,11 @@ class RsyncMethod(AcquisitionMethod):
         command.extend([source_str, self.temporary_mount])
         status = self._run_status(command)
 
+        # We cannot rely on the exit code, because it will probably contain some
+        # errors if a few files cannot be copied.
         if status != 0:
-            return report
+            print(f"Rsync terminated (with status {status})")
+        else:
+            print("Rsync terminated")
 
         return self._dmg_and_hash(report)
