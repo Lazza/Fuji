@@ -39,8 +39,12 @@ You must not save the disk images on the same drive you are acquiring!
 
 ## Development
 
-Fuji is developed as a Universal2 application using the **3.11.7 release** of
+Fuji is developed as a Universal2 application using the **3.10 release** of
 Python from [Python.org][python].
+
+You can create a virtual environment with:
+
+    /usr/local/bin/python3.10 -m venv env
 
 The DMG file can be built by using the included Pyinstaller script:
 
@@ -53,8 +57,8 @@ The following is a list of prerequisites if you want to modify the source code
 or run Fuji from source:
 
 - macOS version 11 or later
-- Python version 3.11 (tested with [3.11.7][python311])
+- Python version 3.10 (tested with [3.10.11][python310])
 
 
 [python]: https://python.org
-[python311]: https://www.python.org/downloads/release/python-3117/
+[python310]: https://www.python.org/downloads/release/python-31011/

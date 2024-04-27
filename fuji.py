@@ -42,14 +42,14 @@ class InputWindow(wx.Frame):
 
         # Components
         title = wx.StaticText(panel, label="Fuji")
-        title_font = wx.Font(
-            36, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_HEAVY
-        )
+        title_font: wx.Font = title.GetFont()
+        title_font.SetPointSize(36)
+        title_font.SetWeight(wx.FONTWEIGHT_EXTRABOLD)
         title.SetFont(title_font)
         desc = wx.StaticText(panel, label="Forensic Unattended Juicy Imaging")
-        desc_font = wx.Font(
-            18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_MEDIUM
-        )
+        desc_font: wx.Font = desc.GetFont()
+        desc_font.SetPointSize(18)
+        desc_font.SetWeight(wx.FONTWEIGHT_BOLD)
         desc.SetFont(desc_font)
 
         byline_text = wx.StaticText(panel, label=f"Version {VERSION} by {AUTHOR}")
@@ -182,9 +182,9 @@ class OverviewWindow(wx.Frame):
 
         # Components
         title = wx.StaticText(panel, label="Acquisition overview")
-        title_font = wx.Font(
-            18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
-        )
+        title_font: wx.Font = title.GetFont()
+        title_font.SetPointSize(18)
+        title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         title.SetFont(title_font)
         self.overview_text = wx.TextCtrl(
             panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
@@ -249,9 +249,9 @@ class ProcessingWindow(wx.Frame):
 
         # Components
         self.title = wx.StaticText(self.panel, label="Acquisition in progress")
-        self.title_font = wx.Font(
-            18, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD
-        )
+        self.title_font: wx.Font = self.title.GetFont()
+        self.title_font.SetPointSize(18)
+        self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         self.title.SetFont(self.title_font)
         self.output_text = wx.TextCtrl(
             self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
