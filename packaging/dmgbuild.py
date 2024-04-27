@@ -17,9 +17,9 @@ files = [
     str(pack_directory / license_file),
 ]
 icon_locations = {
-    settings_file: (100, 100),
-    fuji_app_file: (300, 100),
-    license_file: (500, 100),
+    settings_file: (128, 128),
+    fuji_app_file: (320, 128),
+    license_file: (512, 128),
 }
 badge_icon = str(pack_directory / "Fuji.icns")
 left_bottom_coordinates = (200, 300)
