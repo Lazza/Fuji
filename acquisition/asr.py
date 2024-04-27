@@ -28,7 +28,7 @@ class AsrMethod(AcquisitionMethod):
             "--noprompt",
             "--erase",
         ]
-        status, _ = self._run_process(command, buffer_size=1)
+        status = self._run_status(command, buffer_size=1)
 
         if status != 0:
             return report

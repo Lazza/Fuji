@@ -66,6 +66,7 @@ class AcquisitionMethod(ABC):
     output_path: Path = None
 
     def _run_silent(self, arguments: List[str], awake=True) -> Tuple[int, str]:
+        # Run a process silently. Return its status code and output.
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
 
@@ -75,6 +76,7 @@ class AcquisitionMethod(ABC):
     def _run_process(
         self, arguments: List[str], awake=True, buffer_size=None
     ) -> Tuple[int, str]:
+        # Run a process in plain sight. Return its status code and output.
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
 
@@ -101,6 +103,32 @@ class AcquisitionMethod(ABC):
                 break
 
         return p.returncode, output
+
+    def _run_status(self, arguments: List[str], awake=True, buffer_size=None) -> int:
+        # Run a process in plain sight. Return its status code.
+        if awake:
+            arguments = ["caffeinate", "-dimsu"] + arguments
+
+        p = subprocess.Popen(
+            arguments,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+        )
+
+        while True:
+            if buffer_size:
+                out = p.stdout.read(buffer_size)
+            else:
+                out = p.stdout.readline()
+            sys.stdout.write(out)
+
+            if p.poll() != None:
+                out = p.stdout.read()
+                sys.stdout.write(out)
+                break
+
+        return p.returncode
 
     def _disk_from_device(self, device: str) -> str:
         if not device.startswith("/dev/disk"):
@@ -193,7 +221,7 @@ class AcquisitionMethod(ABC):
 
         i = 1
         while not result:
-            result, _ = self._run_process(["hdiutil", "detach", self.temporary_volume])
+            result = self._run_status(["hdiutil", "detach", self.temporary_volume])
             if result == 0:
                 return True
             i = i + 1
@@ -211,7 +239,7 @@ class AcquisitionMethod(ABC):
         print("\nConverting", self.temporary_path, "->", self.output_path)
         sparseimage = f"{self.temporary_path}"
         dmg = f"{self.output_path}"
-        result, _ = self._run_process(
+        result = self._run_status(
             ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
         )
 

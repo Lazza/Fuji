@@ -56,7 +56,7 @@ class RsyncMethod(AcquisitionMethod):
         for exclusion in exclusions:
             command.extend(["--exclude", f"{exclusion}/"])
         command.extend(["--progress", source_str, self.temporary_mount])
-        status, _ = self._run_process(command)
+        status = self._run_status(command)
 
         if status != 0:
             return report
