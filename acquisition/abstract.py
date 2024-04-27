@@ -22,6 +22,7 @@ class Parameters:
     source: Path = Path("/")
     tmp: Path = Path("/Volumes/Fuji")
     destination: Path = Path("/Volumes/Fuji")
+    sound: bool = True
 
 
 @dataclass

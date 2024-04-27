@@ -1,4 +1,5 @@
 import string
+import subprocess
 import sys
 import threading
 from pathlib import Path
@@ -87,6 +88,12 @@ class InputWindow(wx.Frame):
             description_text.SetLabelMarkup(description_label)
             self.description_texts.append(description_text)
 
+        # Sound checkbox
+        self.sound_checkbox = wx.CheckBox(
+            panel, label="Play loud sound when acquisition is completed"
+        )
+        self.sound_checkbox.SetValue(True)
+
         # Buttons
         continue_btn = wx.Button(panel, label="Continue")
         continue_btn.Bind(wx.EVT_BUTTON, self.on_continue)
@@ -132,6 +139,7 @@ class InputWindow(wx.Frame):
             vbox.Add(description_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         vbox.Add((0, 20))
+        vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
         panel.SetSizer(vbox)
 
@@ -160,6 +168,7 @@ class InputWindow(wx.Frame):
         PARAMS.source = Path(self.source_picker.GetPath())
         PARAMS.tmp = Path(self.tmp_picker.GetPath())
         PARAMS.destination = Path(self.destination_picker.GetPath())
+        PARAMS.sound = self.sound_checkbox.GetValue()
         self.method = METHODS[self.method_choice.GetSelection()]
 
         self.Hide()
@@ -295,10 +304,33 @@ class ProcessingWindow(wx.Frame):
             # Process ended
             wx.CallAfter(self.set_completion_status, result.success)
 
+            if PARAMS.sound:
+                self.play_sound(result.success)
+
         except Exception as e:
             # Acquisition failed
             wx.CallAfter(self.set_completion_status, False)
             wx.CallAfter(sys.stdout.write, f"Error: {str(e)}\n")
+
+    def play_sound(self, success: bool):
+        MAX_VOLUME = 7
+
+        volume_settings = subprocess.check_output(
+            ["osascript", "-e", "get volume settings"], universal_newlines=True
+        )
+        try:
+            current_volume = int(volume_settings.split(":")[1].split(",")[0])
+        except:
+            # Keep reasonable volume
+            current_volume = 50
+        scaled = MAX_VOLUME * (current_volume / 100.0)
+        rounded = round(scaled, 4)
+
+        # Play the sound
+        subprocess.call(["osascript", "-e", f"set Volume {MAX_VOLUME}"])
+        sound = "Glass" if success else "Basso"
+        subprocess.call(["afplay", f"/System/Library/Sounds/{sound}.aiff"])
+        subprocess.call(["osascript", "-e", f"set Volume {rounded}"])
 
     def set_completion_status(self, success):
         if success:
