@@ -230,6 +230,7 @@ class OverviewWindow(wx.Frame):
         overview += f"Temporary image location: {PARAMS.tmp}\n"
         overview += f"DMG destination: {PARAMS.destination}\n"
         overview += f"Acquisition method: {INPUT_WINDOW.method.name}\n"
+        overview += f"Play sound: {PARAMS.sound}\n"
 
         self.overview_text.SetValue(overview)
 
