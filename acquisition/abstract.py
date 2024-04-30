@@ -219,13 +219,12 @@ class AcquisitionMethod(ABC):
 
         return success
 
-    def _detach_temporary_image(self, delay=30, interval=10, attempts=3) -> bool:
+    def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
         print("\nWaiting to detach temporary image...")
         time.sleep(delay)
-        result = False
 
         i = 1
-        while not result:
+        while True:
             result = self._run_status(["hdiutil", "detach", self.temporary_volume])
             if result == 0:
                 return True
@@ -233,6 +232,8 @@ class AcquisitionMethod(ABC):
             if i == attempts:
                 break
             time.sleep(interval)
+
+        print("Failed to detach temporary image!")
         return False
 
     def _generate_dmg(self, report: Report) -> bool:
