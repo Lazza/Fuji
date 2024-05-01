@@ -24,10 +24,11 @@ Please carefully follow the installation procedure:
 
 1. Connect the destination drive to the target Mac computer
 2. Open the Fuji DMG and click on _Full Disk Access Settings.url_
-3. Drag the _Fuji.app_ file on the list of authorized apps **and ensure the
+3. If the window has a "lock" icon, unlock it
+4. Drag the _Fuji.app_ file on the list of authorized apps **and ensure the
    toggle is enabled**
-4. Now you can run _Fuji.app_
-5. When prompted, insert the password for the administrator user
+5. Now you can run _Fuji.app_
+6. When prompted, insert the password for the administrator user
 
 **Important:** before starting the acquisition, you must specify on what drive
 you want to store the temporary sparseimage and the final DMG file. Both values
