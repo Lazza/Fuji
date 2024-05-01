@@ -61,5 +61,23 @@ or run Fuji from source:
 - Python version 3.10 (tested with [3.10.11][python310])
 
 
+## Resources
+
+These are a few of several resources that have helped in the development of this
+software. Some include further reading on the topic:
+
+- An answer to [Can I use ditto on OS X to sync two folders on the same
+  machine?][superuser_answer] summarizes the difference between using Ditto and
+  Rsync, taken from the following article.
+- The [Guide to Backing Up Mac OS X][bombich_guide] by CCC's developer Mike
+  Bombich includes a detailed description of Ditto, Rsync and ASR (with the
+  purpose of creating full disk backups).
+- [A user’s guide to Disk Images][disk_images] describes the features of sparse
+  bundles and sparse images.
+
+
 [python]: https://python.org
 [python310]: https://www.python.org/downloads/release/python-31011/
+[superuser_answer]: https://superuser.com/a/92142/278831
+[bombich_guide]: https://web.archive.org/web/20100107194426/http://www.bombich.com/mactips/image.html
+[disk_images]: https://eclecticlight.co/2022/07/11/a-users-guide-to-disk-images/
