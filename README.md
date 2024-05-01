@@ -66,6 +66,9 @@ or run Fuji from source:
 These are a few of several resources that have helped in the development of this
 software. Some include further reading on the topic:
 
+- The question [How do I copy a list of folders recursively, ignoring
+  errors?][superuser_question] has a couple of interesting leads, mentioning
+  Rsync and Ditto.
 - An answer to [Can I use ditto on OS X to sync two folders on the same
   machine?][superuser_answer] summarizes the difference between using Ditto and
   Rsync, taken from the following article.
@@ -78,6 +81,7 @@ software. Some include further reading on the topic:
 
 [python]: https://python.org
 [python310]: https://www.python.org/downloads/release/python-31011/
+[superuser_question]: https://superuser.com/q/91556/278831
 [superuser_answer]: https://superuser.com/a/92142/278831
 [bombich_guide]: https://web.archive.org/web/20100107194426/http://www.bombich.com/mactips/image.html
 [disk_images]: https://eclecticlight.co/2022/07/11/a-users-guide-to-disk-images/
