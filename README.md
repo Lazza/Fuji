@@ -30,12 +30,18 @@ Please carefully follow the installation procedure:
 5. Now you can run _Fuji.app_
 6. When prompted, insert the password for the administrator user
 
-**Important:** before starting the acquisition, you must specify on what drive
-you want to store the temporary sparseimage and the final DMG file. Both values
-are `/Volumes/Fuji` by default and the _image name_ parameter will be used to
-make a new directory inside those locations.
+### Important notes
 
-You must not save the disk images on the same drive you are acquiring!
+1. Before starting the acquisition, you must specify on what drive you want to
+store the temporary sparseimage and the final DMG file. Both values are
+`/Volumes/Fuji` by default and the _image name_ parameter will be used to make
+a new directory inside those locations.
+
+2. You must not save the disk images on the same drive you are acquiring!
+
+3. If you want to use the Rsync mode, it is recommended to **close all other
+   applications before proceeding, especially Apple Mail,** otherwise some data
+   might not be collected.
 
 
 ## Development
