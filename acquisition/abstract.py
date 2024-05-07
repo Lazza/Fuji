@@ -18,7 +18,7 @@ class Parameters:
     case: str = ""
     examiner: str = ""
     notes: str = ""
-    image_name: str = "MacAcquisition"
+    image_name: str = "Mac_Acquisition"
     source: Path = Path("/")
     tmp: Path = Path("/Volumes/Fuji")
     destination: Path = Path("/Volumes/Fuji")

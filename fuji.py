@@ -368,6 +368,17 @@ class ProcessingWindow(wx.Frame):
 
 
 if __name__ == "__main__":
+    # Try to find the serial number
+    information = subprocess.check_output(
+        ["system_profiler", "SPHardwareDataType"], universal_newlines=True
+    ).splitlines()
+    for line in information:
+        parts = line.strip().split(":")
+        if "Serial" in parts[0] and "(system)" in parts[0]:
+            serial_number = parts[1].strip()
+            PARAMS.image_name = f"{serial_number}_Acquisition"
+            break
+
     app = wx.App()
     INPUT_WINDOW = InputWindow()
     OVERVIEW_WINDOW = OverviewWindow()
