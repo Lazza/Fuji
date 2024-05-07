@@ -1,3 +1,4 @@
+import os
 import string
 import subprocess
 import sys
@@ -85,15 +86,17 @@ class InputWindow(wx.Frame):
         source_label = wx.StaticText(panel, label="Source:")
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
-        self.source_picker.SetPath("/")
+        self.source_picker.SetPath(str(PARAMS.source))
         tmp_label = wx.StaticText(panel, label="Temporary image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
-        self.tmp_picker.SetPath("/Volumes/Fuji")
+        if os.path.isdir(PARAMS.tmp):
+            self.tmp_picker.SetPath(str(PARAMS.tmp))
         destination_label = wx.StaticText(panel, label="DMG destination:")
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
-        self.destination_picker.SetPath("/Volumes/Fuji")
+        if os.path.isdir(PARAMS.destination):
+            self.destination_picker.SetPath(str(PARAMS.destination))
         method_label = wx.StaticText(panel, label="Acquisition method:")
         self.method_choice = wx.Choice(panel, choices=[m.name for m in METHODS])
         self.method_choice.SetSelection(0)
