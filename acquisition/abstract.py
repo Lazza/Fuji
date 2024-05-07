@@ -156,7 +156,8 @@ class AcquisitionMethod(ABC):
         if is_disk:
             result, disk_info = self._run_silent(["diskutil", "info", f"{path}"])
             lines = disk_info.splitlines()
-            if result == 0:
+            valid = len(lines) > 1 and "/dev/disk" in lines[1] and ":" in lines[1]
+            if result == 0 and valid:
                 disk_device = lines[1].split(":")[1].strip()
             else:
                 is_disk = False
@@ -208,13 +209,19 @@ class AcquisitionMethod(ABC):
             return False
 
         result, output = self._run_process(["hdiutil", "attach", image_path])
-        last_line = output.strip().split("\n")[-1]
-        parts = re.split("\s+", last_line, maxsplit=2)
-        self.temporary_volume = parts[0]
-        self.temporary_mount = parts[2]
+        relevant = [
+            line
+            for line in output.strip().splitlines()
+            if line.startswith("/dev/disk") and "/Volumes" in line
+        ]
 
-        success = result == 0
+        success = result == 0 and len(relevant) > 0
         if success:
+            mount_line = relevant[0]
+            parts = re.split("\s+", mount_line, maxsplit=2)
+            self.temporary_volume = parts[0]
+            self.temporary_mount = parts[2]
+
             report.output_files.append(self.temporary_path)
 
         return success
