@@ -52,7 +52,7 @@ class RsyncMethod(AcquisitionMethod):
         source_str = f"{params.source}"
         if not source_str.endswith("/"):
             source_str = source_str + "/"
-        command = ["rsync", "-xrlptgoEv"]
+        command = ["rsync", "-xrlptgoEv", "--progress"]
         for exclusion in exclusions:
             command.extend(["--exclude", f"{exclusion}/"])
         command.extend([source_str, self.temporary_mount])
