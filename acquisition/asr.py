@@ -28,9 +28,14 @@ class AsrMethod(AcquisitionMethod):
             "--noprompt",
             "--erase",
         ]
-        status = self._run_status(command)
+        status, output = self._run_process(command)
 
-        if status != 0:
+        # Sometimes ASR crashes at the end but the acquisition is still OK
+        success = status == 0 or (
+            output.count("..100") > 1 and "Restored target" in output
+        )
+
+        if not success:
             return report
 
         return self._dmg_and_hash(report)
