@@ -1,3 +1,4 @@
 dmgbuild[badge_icons]==1.6.1
+humanize==4.9.0
 pyinstaller==6.6.0
 wxPython==4.2.0

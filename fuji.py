@@ -11,9 +11,11 @@ import wx.lib.agw.hyperlink as hl
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
+from checks.free_space import FreeSpaceCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 
 METHODS = [AsrMethod(), RsyncMethod()]
+CHECKS = [FreeSpaceCheck()]
 PARAMS = Parameters()
 
 INPUT_WINDOW: "InputWindow"
@@ -206,7 +208,7 @@ class OverviewWindow(wx.Frame):
         super().__init__(
             parent=None,
             title="Fuji - Overview",
-            size=(600, 400),
+            size=(800, 400),
             style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
         panel = wx.Panel(self)
@@ -261,6 +263,8 @@ class OverviewWindow(wx.Frame):
             "Play sound": PARAMS.sound,
         }
 
+        max_text_width = 600
+
         # Insert rows into the grid
         for label, value in data.items():
             label_text = wx.StaticText(self.panel, label=label)
@@ -270,9 +274,27 @@ class OverviewWindow(wx.Frame):
             value_text = wx.StaticText(
                 self.panel,
                 label=f"{value}",
-                size=(400, -1),
+                size=(max_text_width, -1),
             )
-            value_text.Wrap(400)
+            value_text.Wrap(max_text_width)
+            self.overview_grid.Add(label_text, 0, wx.ALIGN_LEFT | wx.ALIGN_TOP)
+            self.overview_grid.Add(value_text, 1, wx.ALIGN_LEFT | wx.ALIGN_TOP)
+
+        # Perform checks
+        for check in CHECKS:
+            result = check.execute(PARAMS)
+            label_text = wx.StaticText(self.panel, label=check.name)
+            label_text_font = label_text.GetFont()
+            label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
+            label_text.SetFont(label_text_font)
+            if not result.passed:
+                label_text.SetForegroundColour((240, 20, 20))
+            value_text = wx.StaticText(
+                self.panel,
+                label=result.message,
+                size=(max_text_width, -1),
+            )
+            value_text.Wrap(max_text_width)
             self.overview_grid.Add(label_text, 0, wx.ALIGN_LEFT | wx.ALIGN_TOP)
             self.overview_grid.Add(value_text, 1, wx.ALIGN_LEFT | wx.ALIGN_TOP)
 
