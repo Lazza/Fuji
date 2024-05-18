@@ -87,7 +87,7 @@ class InputWindow(wx.Frame):
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
-        tmp_label = wx.StaticText(panel, label="Temporary image location:")
+        tmp_label = wx.StaticText(panel, label="Temp. image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
@@ -207,6 +207,7 @@ class OverviewWindow(wx.Frame):
             parent=None,
             title="Fuji - Overview",
             size=(600, 400),
+            style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
         panel = wx.Panel(self)
 
@@ -216,9 +217,10 @@ class OverviewWindow(wx.Frame):
         title_font.SetPointSize(18)
         title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         title.SetFont(title_font)
-        self.overview_text = wx.TextCtrl(
-            panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
-        )
+
+        # Overview grid container of 2 columns
+        self.overview_grid = wx.FlexGridSizer(cols=2, hgap=20, vgap=10)
+        self.overview_grid.AddGrowableCol(1, 1)
 
         # Buttons
         back_btn = wx.Button(panel, label="Back")
@@ -230,7 +232,7 @@ class OverviewWindow(wx.Frame):
         vbox = wx.BoxSizer(wx.VERTICAL)
         vbox.Add(title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
         vbox.Add((0, 10))
-        vbox.Add(self.overview_text, 1, wx.EXPAND | wx.ALL, 10)
+        vbox.Add(self.overview_grid, 0, wx.EXPAND | wx.ALL, 10)
         vbox.Add((0, 20))
         hbox = wx.BoxSizer(wx.HORIZONTAL)
         hbox.Add(back_btn, 0, wx.RIGHT, 10)
@@ -238,22 +240,46 @@ class OverviewWindow(wx.Frame):
         vbox.Add(hbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
 
         panel.SetSizer(vbox)
+        self.panel = panel
 
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
     def update_overview(self):
-        overview = f"Case name: {PARAMS.case}\n"
-        overview += f"Examiner: {PARAMS.examiner}\n"
-        overview += f"Notes: {PARAMS.notes}\n"
-        overview += f"Image name: {PARAMS.image_name}\n"
-        overview += f"Source: {PARAMS.source}\n"
-        overview += f"Temporary image location: {PARAMS.tmp}\n"
-        overview += f"DMG destination: {PARAMS.destination}\n"
-        overview += f"Acquisition method: {INPUT_WINDOW.method.name}\n"
-        overview += f"Play sound: {PARAMS.sound}\n"
+        # Clear the existing grid content
+        self.overview_grid.Clear(True)
 
-        self.overview_text.SetValue(overview)
+        data = {
+            "Case name": PARAMS.case,
+            "Examiner": PARAMS.examiner,
+            "Notes": PARAMS.notes,
+            "Image name": PARAMS.image_name,
+            "Source": PARAMS.source,
+            "Temp. image location": PARAMS.tmp,
+            "DMG destination": PARAMS.destination,
+            "Acquisition method": INPUT_WINDOW.method.name,
+            "Play sound": PARAMS.sound,
+        }
+
+        # Insert rows into the grid
+        for label, value in data.items():
+            label_text = wx.StaticText(self.panel, label=label)
+            label_text_font = label_text.GetFont()
+            label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
+            label_text.SetFont(label_text_font)
+            value_text = wx.StaticText(
+                self.panel,
+                label=f"{value}",
+                size=(400, -1),
+            )
+            value_text.Wrap(400)
+            self.overview_grid.Add(label_text, 0, wx.ALIGN_LEFT | wx.ALIGN_TOP)
+            self.overview_grid.Add(value_text, 1, wx.ALIGN_LEFT | wx.ALIGN_TOP)
+
+        # Update the layout
+        self.panel.Layout()
+        self.panel.Fit()
+        self.Fit()
 
     def on_back(self, event):
         # Hide the overview window and show the input window again
