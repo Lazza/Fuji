@@ -11,11 +11,12 @@ import wx.lib.agw.hyperlink as hl
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
+from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 
 METHODS = [AsrMethod(), RsyncMethod()]
-CHECKS = [FreeSpaceCheck()]
+CHECKS = [FoldersCheck(), FreeSpaceCheck()]
 PARAMS = Parameters()
 
 INPUT_WINDOW: "InputWindow"
@@ -89,7 +90,7 @@ class InputWindow(wx.Frame):
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
-        tmp_label = wx.StaticText(panel, label="Temp. image location:")
+        tmp_label = wx.StaticText(panel, label="Temp image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
@@ -257,7 +258,7 @@ class OverviewWindow(wx.Frame):
             "Notes": PARAMS.notes,
             "Image name": PARAMS.image_name,
             "Source": PARAMS.source,
-            "Temp. image location": PARAMS.tmp,
+            "Temp image location": PARAMS.tmp,
             "DMG destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
             "Play sound": PARAMS.sound,
