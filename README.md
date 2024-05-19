@@ -1,3 +1,5 @@
+![Fuji logo and screenshot](./packaging/banner.jpg)
+
 # Fuji: Forensic Unattended Juicy Imaging
 
 Fuji is a free, open source software for performing forensic acquisition of Mac
@@ -96,6 +98,10 @@ The DMG file can be built by using the included Pyinstaller script:
     pyinstaller Fuji.spec
 
 The build process must be executed from a computer running macOS.
+
+The README file in RTF format can be generated with pandoc:
+
+    cat README.md | grep -v 'banner.jpg' | pandoc -f markdown -s -o dist/README.rtf
 
 The following is a list of prerequisites if you want to modify the source code
 or run Fuji from source:
