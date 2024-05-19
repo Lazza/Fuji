@@ -13,10 +13,11 @@ from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
 from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
+from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 
 METHODS = [AsrMethod(), RsyncMethod()]
-CHECKS = [FoldersCheck(), FreeSpaceCheck()]
+CHECKS = [FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
 PARAMS = Parameters()
 
 INPUT_WINDOW: "InputWindow"
