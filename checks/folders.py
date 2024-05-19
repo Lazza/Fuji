@@ -1,6 +1,5 @@
 import os
 
-import humanize
 from acquisition.abstract import Parameters
 from checks.abstract import Check, CheckResult
 
