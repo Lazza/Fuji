@@ -37,11 +37,9 @@ class FreeSpaceCheck(Check):
             free_readable = humanize.naturalsize(destination_free)
             tail = f"(up to {needed_readable} / {free_readable})"
             if result.passed:
-                result.message = f"Free space in destination seems enough {tail}"
+                result.write(f"Free space in destination seems enough {tail}")
             else:
-                result.message = (
-                    f"Free space in destination could be insufficient {tail}"
-                )
+                result.write(f"Free space in destination could be insufficient {tail}")
 
         else:
             tmp_free = self._get_free_space(params.tmp)
@@ -57,23 +55,24 @@ class FreeSpaceCheck(Check):
             result.passed = tmp_passed and destination_passed
             tmp_tail = f"(up to {tmp_needed_readable} / {tmp_free_readable})"
             if tmp_passed:
-                result.message = (
-                    f"Free space in temp. image location seems enough {tmp_tail}"
+                result.write(
+                    f"Free space in temp image location seems enough {tmp_tail}"
                 )
             else:
-                result.message = f"Free space in temp. image location could be insufficient {tmp_tail}"
+                result.write(
+                    f"Free space in temp image location could be insufficient {tmp_tail}"
+                )
 
             destination_tail = (
                 f"(up to {destination_needed_readable} / {destination_free_readable})"
             )
             if destination_passed:
-                result.message = result.message + (
-                    f"\nFree space in destination seems enough {destination_tail}"
+                result.write(
+                    f"Free space in destination seems enough {destination_tail}"
                 )
             else:
-                result.message = (
-                    result.message
-                    + f"\nFree space in destination could be insufficient {destination_tail}"
+                result.write(
+                    +f"Free space in destination could be insufficient {destination_tail}"
                 )
 
         return result

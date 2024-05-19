@@ -9,6 +9,12 @@ class CheckResult:
     passed: bool = True
     message: str = ""
 
+    def write(self, content: str):
+        if self.message:
+            self.message = self.message + "\n" + content
+        else:
+            self.message = content
+
 
 class Check(ABC):
     name = "Abstract check"
