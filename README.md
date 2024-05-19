@@ -80,11 +80,6 @@ be read are skipped.
 Please ensure all other apps are closed, especially Apple Mail, before using the
 Rsync acquisition method.
 
-### Copy and paste does not work inside Fuji
-
-This issue is probably related to the fact that the app is being run as `root`.
-Currently, no solution has been found.
-
 
 ## Development
 
