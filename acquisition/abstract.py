@@ -1,3 +1,4 @@
+import platform
 from datetime import datetime
 import hashlib
 import os
@@ -17,11 +18,20 @@ from meta import AUTHOR, VERSION
 class Parameters:
     case: str = ""
     examiner: str = ""
-    notes: str = ""
+    evidence_number: str = ""
+    # Collect some data from target device
+    sw_vers_output = subprocess.check_output(['sw_vers'], universal_newlines=True)
+    sw_vers_info = {}
+    for line in sw_vers_output.splitlines():
+        key, value = line.split(':')
+        sw_vers_info[key.strip()] = value.strip()
+    notes: str = f"OS: {sw_vers_info['ProductName']} {sw_vers_info['ProductVersion']} (Build {sw_vers_info['BuildVersion']})"
     image_name: str = "Mac_Acquisition"
     source: Path = Path("/")
     tmp: Path = Path("/Volumes/Fuji")
     destination: Path = Path("/Volumes/Fuji")
+    unifiedlog: bool = True
+    system_profiler: bool = True
     sound: bool = True
 
 
@@ -324,6 +334,7 @@ class AcquisitionMethod(ABC):
                     separator,
                     f"Case name: {report.parameters.case}",
                     f"Examiner: {report.parameters.examiner}",
+                    f"Evidence Number: {report.parameters.evidence_number}",
                     f"Notes: {report.parameters.notes}",
                     separator,
                     f"Start time: {report.start_time}",

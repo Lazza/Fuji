@@ -81,8 +81,11 @@ class InputWindow(wx.Frame):
         self.case_text = wx.TextCtrl(panel, value=PARAMS.case)
         examiner_label = wx.StaticText(panel, label="Examiner:")
         self.examiner_text = wx.TextCtrl(panel, value=PARAMS.examiner)
+        evidence_label = wx.StaticText(panel, label="Evidence Number: ")
+        self.evidence_text = wx.TextCtrl(panel, value=PARAMS.evidence_number)
         notes_label = wx.StaticText(panel, label="Notes:")
-        self.notes_text = wx.TextCtrl(panel, value=PARAMS.notes)
+        self.notes_text = wx.TextCtrl(panel, value=PARAMS.notes, style=wx.TE_MULTILINE)
+        self.notes_text.SetMinSize((400, 60))
 
         output_label = wx.StaticText(panel, label="Image name:")
         self.output_text = wx.TextCtrl(panel, value=PARAMS.image_name)
@@ -96,6 +99,7 @@ class InputWindow(wx.Frame):
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
+        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self.on_tmp_location_changed)
         destination_label = wx.StaticText(panel, label="DMG destination:")
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
@@ -113,6 +117,18 @@ class InputWindow(wx.Frame):
             description_text.SetLabelMarkup(description_label)
             self.description_texts.append(description_text)
 
+        # Unified Logs Checkbox
+        self.unifiedlog_checkbox = wx.CheckBox(
+            panel, label="Collect Unified Logs"
+        )
+        self.unifiedlog_checkbox.SetValue(False)
+
+        # System Profiler Checkbox
+        self.system_profiler_checkbox = wx.CheckBox(
+            panel, label="Collect System Profiler"
+        )
+        self.system_profiler_checkbox.SetValue(False)
+
         # Sound checkbox
         self.sound_checkbox = wx.CheckBox(
             panel, label="Play loud sound when acquisition is completed"
@@ -120,6 +136,8 @@ class InputWindow(wx.Frame):
         self.sound_checkbox.SetValue(True)
 
         # Buttons
+        exit_btn = wx.Button(panel, label="Exit")
+        exit_btn.Bind(wx.EVT_BUTTON, self.on_close)
         continue_btn = wx.Button(panel, label="Continue")
         continue_btn.Bind(wx.EVT_BUTTON, self.on_continue)
 
@@ -139,6 +157,8 @@ class InputWindow(wx.Frame):
         case_info.Add(self.case_text, 1, wx.EXPAND)
         case_info.Add(examiner_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         case_info.Add(self.examiner_text, 1, wx.EXPAND)
+        case_info.Add(evidence_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        case_info.Add(self.evidence_text, 1, wx.EXPAND)
         case_info.Add(notes_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         case_info.Add(self.notes_text, 1, wx.EXPAND)
         case_info.AddGrowableCol(1, 1)
@@ -164,8 +184,17 @@ class InputWindow(wx.Frame):
             vbox.Add(description_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         vbox.Add((0, 20))
+        vbox.Add(self.unifiedlog_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+        vbox.Add(self.system_profiler_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
-        vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
+
+        # vbox.Add(exit_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
+        # vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
+        hbox = wx.BoxSizer(wx.HORIZONTAL)
+        hbox.Add(continue_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 10)
+        hbox.Add(exit_btn, 0, wx.ALIGN_CENTER_VERTICAL)
+
+        vbox.Add(hbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
         panel.SetSizer(vbox)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
@@ -175,6 +204,11 @@ class InputWindow(wx.Frame):
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
+    def on_tmp_location_changed(self, event):
+        temp_location = self.tmp_picker.GetPath()
+        destination_location = self.destination_picker.GetPath()
+        if not destination_location:
+            self.destination_picker.SetPath(temp_location)
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
         valid_characters = "-_" + string.ascii_letters + string.digits
@@ -188,12 +222,15 @@ class InputWindow(wx.Frame):
     def on_continue(self, event):
         PARAMS.case = self.case_text.Value
         PARAMS.examiner = self.examiner_text.Value
+        PARAMS.evidence_number = self.evidence_text.Value
         PARAMS.notes = self.notes_text.Value
         PARAMS.image_name = self.output_text.Value
         PARAMS.source = Path(self.source_picker.GetPath())
         PARAMS.tmp = Path(self.tmp_picker.GetPath())
         PARAMS.destination = Path(self.destination_picker.GetPath())
         PARAMS.sound = self.sound_checkbox.GetValue()
+        PARAMS.unifieΩdlog = self.unifiedlog_checkbox.GetValue()
+        PARAMS.system_profiler = self.system_profiler_checkbox.GetValue()
         self.method = METHODS[self.method_choice.GetSelection()]
 
         self.Hide()
@@ -256,12 +293,15 @@ class OverviewWindow(wx.Frame):
         data = {
             "Case name": PARAMS.case,
             "Examiner": PARAMS.examiner,
+            "Evidence Number:": PARAMS.evidence_number,
             "Notes": PARAMS.notes,
             "Image name": PARAMS.image_name,
             "Source": PARAMS.source,
             "Temp image location": PARAMS.tmp,
             "DMG destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
+            "Collect Unified Logs": PARAMS.unifiedlog,
+            "Collect System Profiler": PARAMS.system_profiler,
             "Play sound": PARAMS.sound,
         }
 
@@ -373,9 +413,14 @@ class ProcessingWindow(wx.Frame):
             method = INPUT_WINDOW.method
             result = method.execute(PARAMS)
 
+            if PARAMS.unifiedlog:
+                print(f"Collecting Unified Logs.")
+                self.collect_unifiedlog(result.success)
+            if PARAMS.system_profiler:
+                print(f"Collecting System Profiler.")
+                self.collect_system_profiler(result.success)
             # Process ended
             wx.CallAfter(self.set_completion_status, result.success)
-
             if PARAMS.sound:
                 self.play_sound(result.success)
 
@@ -383,6 +428,27 @@ class ProcessingWindow(wx.Frame):
             # Acquisition failed
             wx.CallAfter(self.set_completion_status, False)
             wx.CallAfter(sys.stdout.write, f"Error: {str(e)}\n")
+
+    def collect_unifiedlog(self, success: bool):
+        try:
+            subprocess.run(["log", "collect", "--output", f"{PARAMS.destination}/{PARAMS.image_name}/{PARAMS.image_name}.logarchive"], check=True)
+            print(f"File: {PARAMS.destination}/{PARAMS.image_name}/{PARAMS.image_name}.logarchive")
+            print("Unified logs collected successfully.\n")
+        except subprocess.CalledProcessError as e:
+            print(f"Error collecting unified logs: {e}\n")
+            return False
+        return success
+
+    def collect_system_profiler(self, success: bool):
+        try:
+            with open(f"{PARAMS.destination}/{PARAMS.image_name}/system_profiler.txt", "w") as output:
+                subprocess.run(["system_profiler"], stdout=output, check=True)
+            print(f"File: {PARAMS.destination}/{PARAMS.image_name}/system_profiler.txt")
+            print("system_profiler collected successfully.\n")
+        except subprocess.CalledProcessError as e:
+            print(f"Error collecting system_profiler logs: {e}\n")
+            return False
+        return success
 
     def play_sound(self, success: bool):
         MAX_VOLUME = 7
