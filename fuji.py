@@ -96,6 +96,7 @@ class InputWindow(wx.Frame):
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
+        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self.on_tmp_location_changed)
         destination_label = wx.StaticText(panel, label="DMG destination:")
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
@@ -175,6 +176,11 @@ class InputWindow(wx.Frame):
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
+    def on_tmp_location_changed(self, event):
+        temp_location = self.tmp_picker.GetPath()
+        destination_location = self.destination_picker.GetPath()
+        if not destination_location:
+            self.destination_picker.SetPath(temp_location)
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
         valid_characters = "-_" + string.ascii_letters + string.digits
