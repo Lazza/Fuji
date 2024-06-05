@@ -181,7 +181,7 @@ class AcquisitionMethod(ABC):
         return details
 
     def _gather_hardware_info(self) -> str:
-        _, hardware_info = self._run_silent(["system_profiler", "SPHardwareDataType"])
+        _, hardware_info = self._run_silent(["system_profiler", "SPSoftwareDataType", "SPHardwareDataType", "SPNVMeDataType", "SPStorageDataType"])
         return hardware_info
 
     def _create_temporary_image(self, report: Report) -> bool:
