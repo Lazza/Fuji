@@ -341,9 +341,9 @@ class AcquisitionMethod(ABC):
                 + [
                     separator,
                     f"Computed hashes ({report.result.path}):",
-                    f"    - MD5: {report.result.md5}",
-                    f"    - SHA1: {report.result.sha1}",
-                    f"    - SHA256: {report.result.sha256}",
+                    f"    - MD5: {report.result.md5.upper()}",
+                    f"    - SHA1: {report.result.sha1.upper()}",
+                    f"    - SHA256: {report.result.sha256.upper()}",
                 ]
             ):
                 output.write(line + "\n")
