@@ -97,6 +97,7 @@ class InputWindow(wx.Frame):
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
         destination_label = wx.StaticText(panel, label="DMG destination:")
+        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self._tmp_location_changed)
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.destination):
@@ -184,6 +185,12 @@ class InputWindow(wx.Frame):
             return
         else:
             return False
+
+    def _tmp_location_changed(self, event):
+        temp_location = self.tmp_picker.GetPath()
+        destination_location = self.destination_picker.GetPath()
+        if not destination_location:
+            self.destination_picker.SetPath(temp_location)
 
     def on_continue(self, event):
         PARAMS.case = self.case_text.Value
