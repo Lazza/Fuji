@@ -91,6 +91,7 @@ Python from [Python.org][python].
 You can create a virtual environment with:
 
     /usr/local/bin/python3.10 -m venv env
+    source env/bin/activate
 
 The DMG file can be built by using the included Pyinstaller script:
 
