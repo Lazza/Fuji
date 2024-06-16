@@ -190,9 +190,9 @@ class InputWindow(wx.Frame):
         PARAMS.examiner = self.examiner_text.Value
         PARAMS.notes = self.notes_text.Value
         PARAMS.image_name = self.output_text.Value
-        PARAMS.source = Path(self.source_picker.GetPath())
-        PARAMS.tmp = Path(self.tmp_picker.GetPath())
-        PARAMS.destination = Path(self.destination_picker.GetPath())
+        PARAMS.source = Path(self.source_picker.GetPath().strip())
+        PARAMS.tmp = Path(self.tmp_picker.GetPath().strip())
+        PARAMS.destination = Path(self.destination_picker.GetPath().strip())
         PARAMS.sound = self.sound_checkbox.GetValue()
         self.method = METHODS[self.method_choice.GetSelection()]
 
