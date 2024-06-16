@@ -232,6 +232,8 @@ class AcquisitionMethod(ABC):
             self.temporary_mount = parts[2]
 
             report.output_files.append(self.temporary_path)
+            # Write preliminary report
+            self._write_report(report)
 
         return success
 
@@ -324,6 +326,24 @@ class AcquisitionMethod(ABC):
         print("\nWriting report file", self.output_report)
 
         separator = "-" * 80
+
+        output_files = []
+        if len(report.output_files):
+            output_files = [
+                separator,
+                "Generated files:",
+            ] + [f"    - {file}" for file in report.output_files]
+
+        hashes = []
+        if report.result:
+            hashes = [
+                separator,
+                f"Computed hashes ({report.result.path.name}):",
+                f"    - MD5: {report.result.md5}",
+                f"    - SHA1: {report.result.sha1}",
+                f"    - SHA256: {report.result.sha256}",
+            ]
+
         with open(self.output_report, "w") as output:
             for line in (
                 [
@@ -342,22 +362,14 @@ class AcquisitionMethod(ABC):
                     separator,
                     report.hardware_info,
                     separator,
+                    "Volume:",
+                    "",
                     report.path_details.disk_info,
-                    separator,
-                    "Generated files:",
                 ]
-                + [f"    - {file}" for file in report.output_files]
-                + [
-                    separator,
-                    f"Computed hashes ({report.result.path}):",
-                    f"    - MD5: {report.result.md5}",
-                    f"    - SHA1: {report.result.sha1}",
-                    f"    - SHA256: {report.result.sha256}",
-                ]
+                + output_files
+                + hashes
             ):
                 output.write(line + "\n")
-
-        print("\nAcquisition completed!")
 
     def _dmg_and_hash(self, report: Report) -> Report:
         result = self._detach_temporary_image()
@@ -374,6 +386,8 @@ class AcquisitionMethod(ABC):
         report.end_time = datetime.now()
 
         self._write_report(report)
+
+        print("\nAcquisition completed!")
         return report
 
     @abstractmethod
