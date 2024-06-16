@@ -68,7 +68,7 @@ class AcquisitionMethod(ABC):
 
     def _limited_read(self, file: IO[str], limit: int, encoding: str) -> str:
         data = os.read(file.fileno(), limit)
-        return data.decode(encoding)
+        return data.decode(encoding, "ignore")
 
     def _run_silent(self, arguments: List[str], awake=True) -> Tuple[int, str]:
         # Run a process silently. Return its status code and output.
