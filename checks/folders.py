@@ -10,6 +10,11 @@ class FoldersCheck(Check):
     def execute(self, params: Parameters) -> CheckResult:
         result = CheckResult(passed=True)
 
+        source_is_directory = os.path.isdir(params.source)
+        if not source_is_directory:
+            result.write("Source is not a directory!")
+            result.passed = False
+
         same_path = params.tmp == params.destination
 
         tmp_is_directory = os.path.isdir(params.tmp)

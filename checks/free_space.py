@@ -9,13 +9,19 @@ class FreeSpaceCheck(Check):
     name = "Free space check"
 
     def _get_used_space(self, path):
-        statvfs = os.statvfs(path)
+        try:
+            statvfs = os.statvfs(path)
+        except FileNotFoundError:
+            return 0
         total_space = statvfs.f_blocks * statvfs.f_frsize
         free_space = statvfs.f_bfree * statvfs.f_frsize
         return total_space - free_space
 
     def _get_free_space(self, path):
-        statvfs = os.statvfs(path)
+        try:
+            statvfs = os.statvfs(path)
+        except FileNotFoundError:
+            return 0
         free_space = statvfs.f_bfree * statvfs.f_frsize
         return free_space
 
@@ -43,12 +49,12 @@ class FreeSpaceCheck(Check):
 
         else:
             tmp_free = self._get_free_space(params.tmp)
-            tmp_passed = tmp_free >= source_used
+            tmp_passed = tmp_free and tmp_free >= source_used
             tmp_needed_readable = humanize.naturalsize(source_used)
             tmp_free_readable = humanize.naturalsize(tmp_free)
 
             destination_free = self._get_free_space(params.destination)
-            destination_passed = destination_free >= source_used
+            destination_passed = destination_free and destination_free >= source_used
             destination_needed_readable = humanize.naturalsize(source_used)
             destination_free_readable = humanize.naturalsize(destination_free)
 
@@ -72,7 +78,7 @@ class FreeSpaceCheck(Check):
                 )
             else:
                 result.write(
-                    +f"Free space in destination could be insufficient {destination_tail}"
+                    f"Free space in destination could be insufficient {destination_tail}"
                 )
 
         return result
