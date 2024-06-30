@@ -1,14 +1,17 @@
-from datetime import datetime
 import hashlib
 import os
 import re
+import selectors
+import shlex
 import subprocess
-from abc import ABC, abstractmethod
 import sys
 import time
-from typing import IO, List, Tuple
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
+from subprocess import Popen
+from typing import IO, List, Tuple
 
 from meta import AUTHOR, VERSION
 
@@ -67,8 +70,36 @@ class AcquisitionMethod(ABC):
     output_path: Path = None
 
     def _limited_read(self, file: IO[str], limit: int, encoding: str) -> str:
-        data = os.read(file.fileno(), limit)
-        return data.decode(encoding, "ignore")
+        sel = selectors.DefaultSelector()
+        sel.register(file, selectors.EVENT_READ)
+
+        events = sel.select(0.125)
+        if events:
+            data = os.read(file.fileno(), limit)
+            return data.decode(encoding, "ignore")
+        else:
+            # Timeout occurred
+            return ""
+
+    def _create_shell_process(
+        self, arguments: List[str], awake=True, tee: Path = None
+    ) -> Popen[str]:
+        if awake:
+            arguments = ["caffeinate", "-dimsu"] + arguments
+
+        command = shlex.join(arguments) + " 2>&1"
+        if tee is not None:
+            tail = shlex.join(["tee", f"{tee}"])
+            command = f"{command} | {tail}"
+
+        print(command)
+        p = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            shell=True,
+            universal_newlines=True,
+        )
+        return p
 
     def _run_silent(self, arguments: List[str], awake=True) -> Tuple[int, str]:
         # Run a process silently. Return its status code and output.
@@ -79,27 +110,20 @@ class AcquisitionMethod(ABC):
         return p.returncode, p.stdout
 
     def _run_process(
-        self, arguments: List[str], awake=True, buffer_size=1024000
+        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
     ) -> Tuple[int, str]:
         # Run a process in plain sight. Return its status code and output.
-        if awake:
-            arguments = ["caffeinate", "-dimsu"] + arguments
-
-        p = subprocess.Popen(
-            arguments,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-        )
+        p = self._create_shell_process(arguments, awake=awake, tee=tee)
 
         encoding = p.stdout.encoding
         output = ""
         while True:
             # Let it breathe and avoid the UI getting stuck
-            time.sleep(0.05)
+            time.sleep(0.1)
             out = self._limited_read(p.stdout, buffer_size, encoding)
-            sys.stdout.write(out)
-            output = output + out
+            if out:
+                sys.stdout.write(out)
+                output = output + out
 
             if p.poll() != None:
                 out = p.stdout.read()
@@ -109,24 +133,19 @@ class AcquisitionMethod(ABC):
 
         return p.returncode, output
 
-    def _run_status(self, arguments: List[str], awake=True, buffer_size=1024000) -> int:
+    def _run_status(
+        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+    ) -> int:
         # Run a process in plain sight. Return its status code.
-        if awake:
-            arguments = ["caffeinate", "-dimsu"] + arguments
-
-        p = subprocess.Popen(
-            arguments,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-        )
+        p = self._create_shell_process(arguments, awake=awake, tee=tee)
 
         encoding = p.stdout.encoding
         while True:
             # Let it breathe and avoid the UI getting stuck
-            time.sleep(0.05)
+            time.sleep(0.1)
             out = self._limited_read(p.stdout, buffer_size, encoding)
-            sys.stdout.write(out)
+            if out:
+                sys.stdout.write(out)
 
             if p.poll() != None:
                 out = p.stdout.read()
