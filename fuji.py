@@ -269,7 +269,7 @@ class OverviewWindow(wx.Frame):
             "Temp image location": PARAMS.tmp,
             "DMG destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
-            "Play sound": 'Yes' if PARAMS.sound else 'No',
+            "Play sound": "Yes" if PARAMS.sound else "No",
         }
 
         max_text_width = 600

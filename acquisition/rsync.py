@@ -13,7 +13,7 @@ class RsyncMethod(AcquisitionMethod):
     def _compute_exclusions(self, params: Parameters) -> List[Path]:
         # Rsync can be tricked into acquiring files multiple times by macOS, due
         # to how it handles mount points inside the APFS container. This method
-        # aims to exclude to acquire duplicates of the same files.
+        # aims to prevent acquiring duplicates of the same files.
 
         _, mount_points = self._run_silent(["mount"])
         lines = mount_points.splitlines()
