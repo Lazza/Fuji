@@ -92,7 +92,6 @@ class AcquisitionMethod(ABC):
             tail = shlex.join(["tee", f"{tee}"])
             command = f"{command} | {tail}"
 
-        print(command)
         p = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
