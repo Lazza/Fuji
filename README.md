@@ -1,4 +1,5 @@
 ![Fuji logo and screenshot](./packaging/banner.jpg)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FLazza%2FFuji.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FLazza%2FFuji?ref=badge_shield)
 
 # Fuji: Forensic Unattended Juicy Imaging
 
@@ -135,3 +136,7 @@ software. Some include further reading on the topic:
 [superuser_answer]: https://superuser.com/a/92142/278831
 [bombich_guide]: https://web.archive.org/web/20100107194426/http://www.bombich.com/mactips/image.html
 [disk_images]: https://eclecticlight.co/2022/07/11/a-users-guide-to-disk-images/
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FLazza%2FFuji.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FLazza%2FFuji?ref=badge_large)
