@@ -11,12 +11,13 @@ import wx.lib.agw.hyperlink as hl
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
+from acquisition.sysdiagnose import SysdiagnoseMethod
 from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 
-METHODS = [AsrMethod(), RsyncMethod()]
+METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
 CHECKS = [FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
 PARAMS = Parameters()
 
