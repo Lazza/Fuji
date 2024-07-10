@@ -45,6 +45,132 @@ class RedirectText(object):
             self.out.Remove(0, position)
         self.out.ShowPosition(self.out.GetLastPosition())
 
+class DevicesWindow(wx.Frame):
+    def __init__(self, parent):
+        super().__init__(parent, title="List of Disks")
+        self.parent = parent
+        panel = wx.Panel(self)
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        devices_label = wx.StaticText(panel, label=" Double-click to accept the selected disk and close the window. ")
+        font = wx.Font(15, wx.FONTFAMILY_DEFAULT, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_BOLD)
+        devices_label.SetFont(font)
+        sizer.Add(devices_label, 0, wx.ALL | wx.LEFT, 10)
+        self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
+
+        # Add columns to the list control with a minimum width
+        min_widths = [10, 10, 10, 10, 10, 10, 10]
+        columns = ['Type', 'Name', 'Size', 'Identifier', 'Device Status', 'Mounted', 'Used Space']
+
+        for idx, col in enumerate(columns):
+            self.list_ctrl.InsertColumn(idx, col, width=min_widths[idx])
+
+        command = "diskutil list | grep '^/dev/' | awk '{print $1}'"
+
+        # subprocess aufrufen, Befehl ausführen und die Ausgabe abfangen
+        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        stdout, stderr = process.communicate()
+
+        # Die Ausgabe (stdout) in Zeilen aufteilen
+        lines = stdout.decode('utf-8').splitlines()
+        data = []
+        for devicename in lines:
+            # Ausgangspunkt ist das jeweilige gerät
+            commandUse = f"diskutil list {devicename} | head -n 1 | awk -F '[()]' '{{print $2}}'"
+            processUse = subprocess.Popen(commandUse, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = processUse.communicate()
+            stringUse = stdout.decode('utf-8')
+
+            commandDiskutilDevice = f"diskutil list {devicename} | grep '^[[:space:]]*[0-9]:'"
+            processDiskutilDevice = subprocess.Popen(commandDiskutilDevice, shell=True, stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE)
+            stdout, stderr = processDiskutilDevice.communicate()
+            stringDiskutilDevice = stdout.decode('utf-8').splitlines()
+            for deviceline in stringDiskutilDevice:
+                # Ausgabe jedes Zeichens mit seiner Position direkt in der Kommandozeile
+                deviceType = ' '.join(deviceline[5:33].split())
+                deviceName = deviceline[33:56]
+                deviceSize = deviceline[56:67]
+                deviceIdentifier = ' '.join(deviceline[67:].split())
+                # Prüfe Mount Point
+                commandDiskutileMountpoint = f"diskutil info /dev/{deviceIdentifier} | grep 'Mount Point:'"
+                processDiskutileMountpoint = subprocess.Popen(commandDiskutileMountpoint, shell=True,
+                                                              stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = processDiskutileMountpoint.communicate()
+                stringDiskutileMountpoint = stdout.decode('utf-8')
+                if len(stringDiskutileMountpoint) == 0:
+                    stringMountpoint = "Not Mounted"
+                    stringUsedSpace = ""
+                else:
+                    stringMountpoint = stringDiskutileMountpoint[30:].splitlines()[0]
+                    commandUsedSpace = f"df -h '{stringMountpoint}' | grep '/dev/{deviceIdentifier}'"
+                    processUsedSpace = subprocess.Popen(commandUsedSpace, shell=True, stdout=subprocess.PIPE,
+                                                        stderr=subprocess.PIPE)
+                    stdout, stderr = processUsedSpace.communicate()
+                    stringUsedSpaceFullString = stdout.decode('utf-8')
+                    stringUsedSpacePercent = ' '.join(stringUsedSpaceFullString[38:46].split())
+                    stringUsedSpace = f"{' '.join(stringUsedSpaceFullString[23:30].split())} ({stringUsedSpacePercent})"
+
+                data.append((deviceType, deviceName, deviceSize, deviceIdentifier, stringUse, stringMountpoint,
+                             stringUsedSpace))
+        selected_index = None
+        for idx, (col1, col2, col3, col4, col5, col6, col7) in enumerate(data):
+            index = self.list_ctrl.InsertItem(idx, col1)
+            self.list_ctrl.SetItem(index, 1, col2)
+            self.list_ctrl.SetItem(index, 2, col3)
+            self.list_ctrl.SetItem(index, 3, col4)
+            self.list_ctrl.SetItem(index, 4, col5)
+            self.list_ctrl.SetItem(index, 5, col6)
+            self.list_ctrl.SetItem(index, 6, col7)
+            self.list_ctrl.SetItemData(index, idx)
+            if str(col6) == str(PARAMS.source):
+                selected_index = index
+
+        # Adjust column width to fit content but keep minimum width
+        sum_width = self.adjust_column_widths(min_widths)
+
+        num_rows = len(data)
+        row_height = (self.list_ctrl.GetItemRect(0).GetHeight()+2) if num_rows > 0 else 0
+        header_height = 30
+        table_height = num_rows * row_height + header_height + 30  # Add some padding
+
+        # Get the display size
+        display_size = wx.Display().GetGeometry().GetSize()
+        max_height = display_size.GetHeight() - 100  # Subtract some space for window decorations
+        max_width = display_size.GetWidth()
+
+        # Add the list control to the sizer
+        sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 10)
+        panel.SetSizer(sizer)
+
+        self.SetSize(wx.Size(min(sum_width, max_width), min(table_height, max_height)))
+
+        if selected_index is not None:
+            self.list_ctrl.Select(selected_index)
+            self.list_ctrl.Focus(selected_index)
+
+    def adjust_column_widths(self, min_widths):
+        sum_width = 0
+        for col in range(self.list_ctrl.GetColumnCount()):
+            self.list_ctrl.SetColumnWidth(col, wx.LIST_AUTOSIZE)
+            width = self.list_ctrl.GetColumnWidth(col)
+            if width < min_widths[col]:
+                self.list_ctrl.SetColumnWidth(col, min_widths[col])
+                width = min_widths[col]  # Ensure sum_width includes the minimum width if set
+            sum_width += width
+        # Add 30 px
+        sum_width += 30
+        return sum_width
+
+    def on_item_activated(self, event):
+        index = event.GetIndex()
+        mounted = self.list_ctrl.GetItem(index, 5).GetText()
+        if mounted != "Not Mounted":
+            PARAMS.source = mounted
+            self.parent.source_picker.SetPath(mounted)
+            self.parent.source_picker.SetFocus()
+        self.Close()
 
 class InputWindow(wx.Frame):
     method: AcquisitionMethod
@@ -92,11 +218,15 @@ class InputWindow(wx.Frame):
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
+        # Add Devices button
+        devices_button = wx.Button(panel, label="Show all Disks")
+        devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
         tmp_label = wx.StaticText(panel, label="Temp image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
+        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self.on_tmp_location_changed)
         destination_label = wx.StaticText(panel, label="DMG destination:")
         self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self._tmp_location_changed)
         self.destination_picker = wx.DirPickerCtrl(panel)
@@ -152,6 +282,8 @@ class InputWindow(wx.Frame):
         output_info.Add(self.output_text, 1, wx.EXPAND)
         output_info.Add(source_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.source_picker, 1, wx.EXPAND)
+        output_info.Add(wx.StaticText(panel, label=""), 0)  # Empty space
+        output_info.Add(devices_button, 0, wx.EXPAND)
         output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.tmp_picker, 1, wx.EXPAND)
         output_info.Add(destination_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
@@ -177,6 +309,14 @@ class InputWindow(wx.Frame):
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
+    def on_open_devices(self, event):
+        devices_window = DevicesWindow(self)
+        devices_window.Show()
+    def on_tmp_location_changed(self, event):
+        temp_location = self.tmp_picker.GetPath()
+        destination_location = self.destination_picker.GetPath()
+        if not destination_location:
+            self.destination_picker.SetPath(temp_location)
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
         valid_characters = "-_" + string.ascii_letters + string.digits
