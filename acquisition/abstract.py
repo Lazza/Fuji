@@ -65,6 +65,7 @@ class AcquisitionMethod(ABC):
     description = "This method cannot be used directly"
 
     temporary_path: Path = None
+    temporary_container: str = None
     temporary_volume: str = None
     temporary_mount: str = None
     output_path: Path = None
@@ -211,15 +212,32 @@ class AcquisitionMethod(ABC):
         )
         return hardware_info
 
+    def _get_os_version(self) -> tuple:
+        information = subprocess.check_output(
+            ["sw_vers"], universal_newlines=True
+        ).splitlines()
+        macos_version = (1, 0)
+        for line in information:
+            if "ProductVersion:" in line:
+                version = line.split(":")[1].strip()
+                macos_version = tuple(map(int, version.split(".")))
+                break
+        return macos_version
+
     def _create_temporary_image(self, report: Report) -> bool:
         params = report.parameters
         output_directory = params.tmp / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
 
+        best_filesystem = "APFS"
+        if self._get_os_version() < (10, 13):
+            best_filesystem = "HFS+"
+
         sectors = report.path_details.disk_sectors
         self.temporary_path = output_directory / f"{params.image_name}.sparseimage"
 
         image_path: str = f"{self.temporary_path}"
+        self.temporary_container = None
         self.temporary_volume = None
         result, output = self._run_process(
             [
@@ -227,6 +245,8 @@ class AcquisitionMethod(ABC):
                 "create",
                 "-sectors",
                 f"{sectors}",
+                "-fs",
+                best_filesystem,
                 "-volname",
                 params.image_name,
                 image_path,
@@ -236,15 +256,20 @@ class AcquisitionMethod(ABC):
             return False
 
         result, output = self._run_process(["hdiutil", "attach", image_path])
-        relevant = [
-            line
-            for line in output.strip().splitlines()
-            if line.startswith("/dev/disk") and "/Volumes" in line
-        ]
+        output_lines = output.strip().splitlines()
 
-        success = result == 0 and len(relevant) > 0
+        container_lines = [
+            line for line in output_lines if line.startswith("/dev/disk")
+        ]
+        volume_lines = [line for line in container_lines if "/Volumes" in line]
+
+        success = result == 0 and len(volume_lines) > 0
         if success:
-            mount_line = relevant[0]
+            container_line = container_lines[0]
+            parts = re.split("\s+", container_line, maxsplit=2)
+            self.temporary_container = parts[0]
+
+            mount_line = volume_lines[0]
             parts = re.split("\s+", mount_line, maxsplit=2)
             self.temporary_volume = parts[0]
             self.temporary_mount = parts[2]
@@ -263,14 +288,16 @@ class AcquisitionMethod(ABC):
         while True:
             result = self._run_status(["hdiutil", "detach", self.temporary_volume])
             if result == 0:
-                return True
+                break
             i = i + 1
             if i == attempts:
-                break
+                print("Failed to detach temporary image!")
+                return False
             time.sleep(interval)
 
-        print("Failed to detach temporary image!")
-        return False
+        # This could be automatically unmounted, we don't check for success
+        _ = self._run_status(["hdiutil", "detach", self.temporary_container])
+        return True
 
     def _generate_dmg(self, report: Report) -> bool:
         params = report.parameters
