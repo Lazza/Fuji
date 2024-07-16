@@ -233,7 +233,9 @@ class AcquisitionMethod(ABC):
         if self._get_os_version() < (10, 13):
             best_filesystem = "HFS+"
 
-        sectors = report.path_details.disk_sectors
+        # Add a bit of extra space to ensure the destination is large enough
+        extra_gigabyte_sectors = 2 * 10**6
+        sectors = report.path_details.disk_sectors + extra_gigabyte_sectors
         self.temporary_path = output_directory / f"{params.image_name}.sparseimage"
 
         image_path: str = f"{self.temporary_path}"
