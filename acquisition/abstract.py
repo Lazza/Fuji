@@ -14,6 +14,7 @@ from subprocess import Popen
 from typing import IO, List, Tuple
 
 from meta import AUTHOR, VERSION
+from shared.utils import command_to_properties
 
 
 @dataclass
@@ -37,6 +38,7 @@ class PathDetails:
     disk_parent: str = ""
     disk_identifier: int = 0
     disk_info: str = ""
+    filesystem: str = ""
 
 
 @dataclass
@@ -173,18 +175,20 @@ class AcquisitionMethod(ABC):
 
         disk_device = ""
         if is_disk:
-            result, disk_info = self._run_silent(["diskutil", "info", f"{path}"])
-            lines = disk_info.splitlines()
-            valid = len(lines) > 1 and "/dev/disk" in lines[1] and ":" in lines[1]
-            if result == 0 and valid:
-                disk_device = lines[1].split(":")[1].strip()
+            diskutil_info = command_to_properties(["diskutil", "info", f"{path}"])
+
+            valid = "Device Node" in diskutil_info
+            if valid:
+                disk_device = diskutil_info["Device Node"]
             else:
                 is_disk = False
+            filesystem = diskutil_info.get("Type (Bundle)", "")
         else:
             mount_point = self._find_mount_point(path)
             mount_info = self._gather_path_info(mount_point)
             disk_device = mount_info.disk_device
             disk_info = mount_info.disk_info
+            filesystem = mount_info.filesystem
 
         disk_identifier = os.stat(path).st_dev
 
@@ -196,6 +200,7 @@ class AcquisitionMethod(ABC):
             disk_parent=self._disk_from_device(disk_device),
             disk_identifier=disk_identifier,
             disk_info=disk_info,
+            filesystem=filesystem,
         )
         return details
 
@@ -212,26 +217,14 @@ class AcquisitionMethod(ABC):
         )
         return hardware_info
 
-    def _get_os_version(self) -> tuple:
-        information = subprocess.check_output(
-            ["sw_vers"], universal_newlines=True
-        ).splitlines()
-        macos_version = (1, 0)
-        for line in information:
-            if "ProductVersion:" in line:
-                version = line.split(":")[1].strip()
-                macos_version = tuple(map(int, version.split(".")))
-                break
-        return macos_version
-
     def _create_temporary_image(self, report: Report) -> bool:
         params = report.parameters
         output_directory = params.tmp / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
 
-        best_filesystem = "APFS"
-        if self._get_os_version() < (10, 13):
-            best_filesystem = "HFS+"
+        best_filesystem = "HFS+"
+        if report.path_details.filesystem == "apfs":
+            best_filesystem = "APFS"
 
         # Add a bit of extra space to ensure the destination is large enough
         extra_gigabyte_sectors = 2 * 10**6

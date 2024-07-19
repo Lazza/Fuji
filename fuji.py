@@ -16,6 +16,7 @@ from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
+from shared.utils import lines_to_properties
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
 CHECKS = [FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
@@ -398,8 +399,9 @@ class ProcessingWindow(wx.Frame):
         volume_settings = subprocess.check_output(
             ["osascript", "-e", "get volume settings"], universal_newlines=True
         )
+        volume_properties = lines_to_properties(volume_settings.split(","))
         try:
-            current_volume = int(volume_settings.split(":")[1].split(",")[0])
+            current_volume = int(volume_properties.get("output volume"))
         except:
             # Keep reasonable volume
             current_volume = 50
