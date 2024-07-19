@@ -16,7 +16,7 @@ from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
-from shared.utils import lines_to_properties
+from shared.utils import command_to_properties, lines_to_properties
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
 CHECKS = [FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
@@ -432,15 +432,14 @@ class ProcessingWindow(wx.Frame):
 
 if __name__ == "__main__":
     # Try to find the serial number
-    information = subprocess.check_output(
-        ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"], universal_newlines=True
-    ).splitlines()
-    for line in information:
-        if "IOPlatformSerialNumber" in line:
-            parts = line.split("=")
-            serial_number = parts[1].strip(' "')
-            PARAMS.image_name = f"{serial_number}_Acquisition"
-            break
+    information = command_to_properties(
+        ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],
+        separator="=",
+        strip_chars='"<> ',
+    )
+    if "IOPlatformSerialNumber" in information:
+        serial_number = information["IOPlatformSerialNumber"]
+        PARAMS.image_name = f"{serial_number}_Acquisition"
 
     app = wx.App()
     INPUT_WINDOW = InputWindow()
