@@ -46,6 +46,7 @@ class RedirectText(object):
             self.out.Remove(0, position)
         self.out.ShowPosition(self.out.GetLastPosition())
 
+
 class DevicesWindow(wx.Frame):
     def __init__(self, parent):
         super().__init__(parent, title="List of Disks")
@@ -173,6 +174,7 @@ class DevicesWindow(wx.Frame):
             self.parent.source_picker.SetFocus()
         self.Close()
 
+
 class InputWindow(wx.Frame):
     method: AcquisitionMethod
 
@@ -227,7 +229,6 @@ class InputWindow(wx.Frame):
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
-        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self.on_tmp_location_changed)
         destination_label = wx.StaticText(panel, label="DMG destination:")
         self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self._tmp_location_changed)
         self.destination_picker = wx.DirPickerCtrl(panel)
@@ -313,11 +314,13 @@ class InputWindow(wx.Frame):
     def on_open_devices(self, event):
         devices_window = DevicesWindow(self)
         devices_window.Show()
+
     def on_tmp_location_changed(self, event):
         temp_location = self.tmp_picker.GetPath()
         destination_location = self.destination_picker.GetPath()
         if not destination_location:
             self.destination_picker.SetPath(temp_location)
+
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
         valid_characters = "-_" + string.ascii_letters + string.digits
