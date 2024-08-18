@@ -52,22 +52,17 @@ class DevicesWindow(wx.Frame):
         super().__init__(parent, title="Fuji - Drives and partitions")
         self.parent = parent
         panel = wx.Panel(self)
-        vbox = wx.BoxSizer(wx.VERTICAL)
 
-        title = wx.StaticText(panel, label="List of drives and mount points")
+        title = wx.StaticText(panel, label="List of drives and partitions")
         title_font: wx.Font = title.GetFont()
         title_font.SetPointSize(18)
         title_font.SetWeight(wx.FONTWEIGHT_BOLD)
         title.SetFont(title_font)
 
-        vbox.Add(title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
-
         devices_label = wx.StaticText(
             panel,
             label="The source can be set by double-clicking on a mounted partition",
         )
-        vbox.Add(devices_label, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 10)
-        vbox.Add((0, 10))
 
         self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
@@ -199,7 +194,11 @@ class DevicesWindow(wx.Frame):
 
         self.list_ctrl.SetMinSize(wx.Size(width, height))
 
-        # Add the list control to the sizer
+        # Add controls to the sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox.Add(title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
+        vbox.Add(devices_label, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 10)
+        vbox.Add((0, 10))
         vbox.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, border=10)
         panel.SetSizerAndFit(vbox)
 
@@ -272,7 +271,7 @@ class InputWindow(wx.Frame):
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
         # Add Devices button
-        devices_button = wx.Button(panel, label="Show all Disks")
+        devices_button = wx.Button(panel, label="List of drives and partitions")
         devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
         tmp_label = wx.StaticText(panel, label="Temp image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
@@ -334,7 +333,7 @@ class InputWindow(wx.Frame):
         output_info.Add(self.output_text, 1, wx.EXPAND)
         output_info.Add(source_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.source_picker, 1, wx.EXPAND)
-        output_info.Add(wx.StaticText(panel, label=""), 0)  # Empty space
+        output_info.Add((0,0))
         output_info.Add(devices_button, 0, wx.EXPAND)
         output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.tmp_picker, 1, wx.EXPAND)
