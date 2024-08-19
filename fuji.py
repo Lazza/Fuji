@@ -1,10 +1,15 @@
+from dataclasses import dataclass
 import os
+import plistlib
+import re
 import string
 import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import List
 
+import humanize
 import wx
 import wx.lib.agw.hyperlink as hl
 
@@ -47,7 +52,63 @@ class RedirectText(object):
         self.out.ShowPosition(self.out.GetLastPosition())
 
 
+@dataclass
+class DiskSpaceInfo:
+    identifier: str = ""
+    size: int = 0
+    used_space: int = 0
+    mount_point: str = ""
+
+
+@dataclass
+class DeviceInfo:
+    indent: int = 0
+    type: str = ""
+    name: str = ""
+    identifier: str = ""
+    status: str = ""
+    disk_space: DiskSpaceInfo = None
+
+
 class DevicesWindow(wx.Frame):
+    def _fetch_info(self, device, mount_info: dict, indent=0) -> DeviceInfo:
+        device_type = device.get("Content", "")
+        identifier = device.get("DeviceIdentifier", "")
+
+        if device_type == "Apple_APFS_Container":
+            device_type = "APFS Container Scheme"
+
+        return DeviceInfo(
+            indent=indent,
+            type=device_type,
+            identifier=identifier,
+            disk_space=mount_info.get(identifier),
+        )
+
+    def _fetch_volume_info(
+        self, device, snapshots: dict, mount_info: dict
+    ) -> DeviceInfo:
+        indent = 1
+        device_type = "APFS Volume"
+        name = device.get("VolumeName", "")
+        size = device.get("Size", 0)
+        identifier = device.get("DeviceIdentifier", "")
+        mount_point = device.get("MountPoint", "")
+        used_space = device.get("CapacityInUse", 0)
+
+        if identifier in snapshots:
+            device_type = "APFS Snapshot"
+            name = snapshots[identifier]
+            indent = 2
+
+        return DeviceInfo(
+            indent=indent,
+            type=device_type,
+            name=name,
+            identifier=identifier,
+            disk_space=mount_info.get(identifier),
+        )
+
     def __init__(self, parent):
         super().__init__(parent, title="Fuji - Drives and partitions")
         self.parent = parent
@@ -67,12 +128,60 @@ class DevicesWindow(wx.Frame):
         self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
 
+        mount_info = {}
+        df_lines = subprocess.check_output(["df"], universal_newlines=True).splitlines()
+        for line in df_lines:
+            if not line.startswith("/dev/disk"):
+                continue
+            identifier, size, used, _, _, _, _, _, mount_point = re.split(
+                "\s+", line, maxsplit=8
+            )
+            short_identifier = identifier[5:]
+            mount_info[short_identifier] = DiskSpaceInfo(
+                identifier=identifier,
+                size=int(size) * 512,
+                used_space=int(used) * 512,
+                mount_point=mount_point,
+            )
+
+        plist_disks = subprocess.check_output(["diskutil", "list", "-plist"])
+        disks_data = plistlib.loads(plist_disks)
+
+        data: List[DeviceInfo] = []
+        skip_stores = []
+        snapshots = {}
+        for disk in disks_data.get("AllDisksAndPartitions", []):
+            stores = disk.get("APFSPhysicalStores", [])
+            if len(stores) and stores[0].get("DeviceIdentifier") in skip_stores:
+                continue
+
+            # One entry for the drive
+            data.append(self._fetch_info(disk, mount_info))
+
+            # One entry for each partition
+            for partition in disk.get("Partitions", []):
+                # Skip ISC and Recovery like macOS does
+                if partition.get("Content") in (
+                    "Apple_APFS_ISC",
+                    "Apple_APFS_Recovery",
+                ):
+                    skip_stores.append(partition.get("DeviceIdentifier"))
+                data.append(self._fetch_info(partition, mount_info, indent=1))
+
+            # One entry for each APFS volume
+            for volume in disk.get("APFSVolumes", []):
+                for snapshot in volume.get("MountedSnapshots", []):
+                    snapshots[snapshot.get("SnapshotBSD")] = snapshot.get(
+                        "SnapshotName"
+                    )
+                data.append(self._fetch_volume_info(volume, snapshots, mount_info))
+
         # Add columns to the list control with a minimum width
         columns = [
+            "Identifier",
             "Type",
             "Name",
             "Size",
-            "Identifier",
             "Device status",
             "Mount point",
             "Used space",
@@ -81,102 +190,33 @@ class DevicesWindow(wx.Frame):
         for index, col in enumerate(columns):
             self.list_ctrl.InsertColumn(index, col, width=-1)
 
-        command = "diskutil list | grep '^/dev/' | awk '{print $1}'"
+        highlight = wx.Colour()
+        highlight.SetRGBA(0x18808080)
+        for index, line in enumerate(data):
+            size_str = ''
+            mount_point = ''
+            used_str = ''
+            disk_space = line.disk_space
+            if disk_space:
+                size_str = humanize.naturalsize(disk_space.size)
+                mount_point = disk_space.mount_point
+                used_str = humanize.naturalsize(disk_space.used_space)
 
-        # subprocess aufrufen, Befehl ausführen und die Ausgabe abfangen
-        process = subprocess.Popen(
-            command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-        stdout, stderr = process.communicate()
-
-        # Die Ausgabe (stdout) in Zeilen aufteilen
-        lines = stdout.decode("utf-8").splitlines()
-        data = []
-        for devicename in lines:
-            # Ausgangspunkt ist das jeweilige gerät
-            commandUse = (
-                f"diskutil list {devicename} | head -n 1 | awk -F '[()]' '{{print $2}}'"
+            index = self.list_ctrl.InsertItem(
+                index, f"{'  ' * line.indent}{line.identifier}"
             )
-            processUse = subprocess.Popen(
-                commandUse, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-            )
-            stdout, stderr = processUse.communicate()
-            stringUse = stdout.decode("utf-8")
-
-            commandDiskutilDevice = (
-                f"diskutil list {devicename} | grep '^[[:space:]]*[0-9]:'"
-            )
-            processDiskutilDevice = subprocess.Popen(
-                commandDiskutilDevice,
-                shell=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-            stdout, stderr = processDiskutilDevice.communicate()
-            stringDiskutilDevice = stdout.decode("utf-8").splitlines()
-            for deviceline in stringDiskutilDevice:
-                # Ausgabe jedes Zeichens mit seiner Position direkt in der Kommandozeile
-                deviceType = " ".join(deviceline[5:33].split())
-                deviceName = deviceline[33:56]
-                deviceSize = deviceline[56:67]
-                deviceIdentifier = " ".join(deviceline[67:].split())
-                # Prüfe Mount Point
-                commandDiskutileMountpoint = (
-                    f"diskutil info /dev/{deviceIdentifier} | grep 'Mount Point:'"
-                )
-                processDiskutileMountpoint = subprocess.Popen(
-                    commandDiskutileMountpoint,
-                    shell=True,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                )
-                stdout, stderr = processDiskutileMountpoint.communicate()
-                stringDiskutileMountpoint = stdout.decode("utf-8")
-                if len(stringDiskutileMountpoint) == 0:
-                    stringMountpoint = "-"
-                    stringUsedSpace = ""
-                else:
-                    stringMountpoint = stringDiskutileMountpoint[30:].splitlines()[0]
-                    commandUsedSpace = (
-                        f"df -h '{stringMountpoint}' | grep '/dev/{deviceIdentifier}'"
-                    )
-                    processUsedSpace = subprocess.Popen(
-                        commandUsedSpace,
-                        shell=True,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                    )
-                    stdout, stderr = processUsedSpace.communicate()
-                    stringUsedSpaceFullString = stdout.decode("utf-8")
-                    stringUsedSpacePercent = " ".join(
-                        stringUsedSpaceFullString[38:46].split()
-                    )
-                    stringUsedSpace = f"{' '.join(stringUsedSpaceFullString[23:30].split())} ({stringUsedSpacePercent})"
-
-                data.append(
-                    (
-                        deviceType,
-                        deviceName,
-                        deviceSize,
-                        deviceIdentifier,
-                        stringUse,
-                        stringMountpoint,
-                        stringUsedSpace,
-                    )
-                )
-
-        selected_index = None
-        for index, (col1, col2, col3, col4, col5, col6, col7) in enumerate(data):
-            index = self.list_ctrl.InsertItem(index, col1)
-            self.list_ctrl.SetItem(index, 1, col2)
-            self.list_ctrl.SetItem(index, 2, col3)
-            self.list_ctrl.SetItem(index, 3, col4)
-            self.list_ctrl.SetItem(index, 4, col5)
-            self.list_ctrl.SetItem(index, 5, col6)
-            self.list_ctrl.SetItem(index, 6, col7)
+            self.list_ctrl.SetItem(index, 1, line.type)
+            self.list_ctrl.SetItem(index, 2, line.name)
+            self.list_ctrl.SetItem(index, 3, size_str)
+            self.list_ctrl.SetItem(index, 4, line.status)
+            self.list_ctrl.SetItem(index, 5, mount_point)
+            self.list_ctrl.SetItem(index, 6, used_str)
             self.list_ctrl.SetItemData(index, index)
-            if str(col6) == str(PARAMS.source):
-                selected_index = index
+            if f"{PARAMS.source}" == mount_point:
+                self.list_ctrl.Select(index)
+                self.list_ctrl.Focus(index)
+            if index % 2:
+                self.list_ctrl.SetItemBackgroundColour(index, highlight)
 
         padding = 10
         width = padding * 4
@@ -185,6 +225,9 @@ class DevicesWindow(wx.Frame):
             self.list_ctrl.SetColumnWidth(index, wx.LIST_AUTOSIZE)
             # Add a bit of padding
             padded_width = self.list_ctrl.GetColumnWidth(index) + padding
+            padded_width = max(padded_width, 100)
+            if index == 2:
+                padded_width = min(padded_width, 180)
             self.list_ctrl.SetColumnWidth(index, padded_width)
             width = width + padded_width
 
@@ -209,10 +252,6 @@ class DevicesWindow(wx.Frame):
         # The list control might become quite big, thus this line sets a
         # reasonable minimum so the window can be reduced
         self.SetMinSize(wx.Size(480, 240))
-
-        if selected_index is not None:
-            self.list_ctrl.Select(selected_index)
-            self.list_ctrl.Focus(selected_index)
 
     def on_item_activated(self, event):
         index = event.GetIndex()
@@ -333,7 +372,7 @@ class InputWindow(wx.Frame):
         output_info.Add(self.output_text, 1, wx.EXPAND)
         output_info.Add(source_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.source_picker, 1, wx.EXPAND)
-        output_info.Add((0,0))
+        output_info.Add((0, 0))
         output_info.Add(devices_button, 0, wx.EXPAND)
         output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.tmp_picker, 1, wx.EXPAND)
