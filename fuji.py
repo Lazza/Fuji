@@ -242,14 +242,20 @@ class DevicesWindow(wx.Frame):
         # reasonable minimum so the window can be reduced
         self.SetMinSize(wx.Size(480, 240))
 
+    def _back_to_selected(self):
+        try:
+            self.list_ctrl.Select(self.selected_index)
+            self.list_ctrl.Focus(self.selected_index)
+        except:
+            pass
+
     def on_item_focused(self, event):
         index = event.GetIndex()
         device: DeviceInfo = self.devices[index]
         if device.disk_space and device.disk_space.mount_point:
             self.selected_index = event.GetIndex()
         else:
-            self.list_ctrl.Select(self.selected_index)
-            self.list_ctrl.Focus(self.selected_index)
+            self._back_to_selected()
 
     def on_item_activated(self, event):
         index = event.GetIndex()
@@ -268,8 +274,7 @@ class DevicesWindow(wx.Frame):
             )
             self.Close()
         else:
-            self.list_ctrl.Select(self.selected_index)
-            self.list_ctrl.Focus(self.selected_index)
+            self._back_to_selected()
 
 
 class InputWindow(wx.Frame):
