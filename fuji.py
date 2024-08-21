@@ -1,10 +1,14 @@
+from dataclasses import dataclass
 import os
+import re
 import string
 import subprocess
 import sys
 import threading
 from pathlib import Path
+from typing import Iterable, List
 
+import humanize
 import wx
 import wx.lib.agw.hyperlink as hl
 
@@ -45,6 +49,223 @@ class RedirectText(object):
             position = self.out.XYToPosition(0, delta - 1)
             self.out.Remove(0, position)
         self.out.ShowPosition(self.out.GetLastPosition())
+
+
+@dataclass
+class DiskSpaceInfo:
+    identifier: str = ""
+    size: int = 0
+    used_space: int = 0
+    free_space: int = 0
+    mount_point: str = ""
+
+
+@dataclass
+class DeviceInfo:
+    indent: int = 0
+    type: str = ""
+    name: str = ""
+    size: str = ""
+    identifier: str = ""
+    status: str = ""
+    disk_space: DiskSpaceInfo = None
+
+
+class DevicesWindow(wx.Frame):
+    def _parse_stanza(self, stanza: str, mount_info: dict) -> Iterable[DeviceInfo]:
+        lines = stanza.splitlines()
+        first, second = lines[:2]
+        status = ""
+        if "(" in first:
+            status = first.split("(")[1].split(")")[0]
+        pivot_1 = second.index(":") + 1
+        pivot_2 = second.index(" NAME")
+        pivot_3 = second.index(" SIZE")
+        pivot_4 = second.index(" IDENTIFIER")
+
+        is_disk = True
+        for line in lines[2:]:
+            type = line[pivot_1 + 1 : pivot_2].strip()
+            name = line[pivot_2:pivot_3].strip()
+            size = line[pivot_3 + 1 : pivot_4].strip()
+            identifier = line[pivot_4:].strip()
+            if not identifier:
+                continue
+            indent = identifier[4:].count("s")
+            if identifier == "-":
+                indent = 1
+            device_info = DeviceInfo(
+                indent=indent,
+                type=type,
+                name=name,
+                size=size,
+                identifier=identifier,
+                status=status if is_disk else "",
+                disk_space=mount_info.get(identifier),
+            )
+
+            is_disk = False
+            yield device_info
+
+    def __init__(self, parent):
+        super().__init__(parent, title="Fuji - Drives and partitions")
+        self.parent = parent
+        panel = wx.Panel(self)
+
+        title = wx.StaticText(panel, label="List of drives and partitions")
+        title_font: wx.Font = title.GetFont()
+        title_font.SetPointSize(18)
+        title_font.SetWeight(wx.FONTWEIGHT_BOLD)
+        title.SetFont(title_font)
+
+        devices_label = wx.StaticText(
+            panel,
+            label="The source can be set by double-clicking on a mounted partition",
+        )
+
+        self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.list_ctrl.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
+        self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
+
+        mount_info = {}
+        df_lines = subprocess.check_output(["df"], universal_newlines=True).splitlines()
+        for line in df_lines:
+            if not line.startswith("/dev/disk"):
+                continue
+            identifier, size, used, free, _, _, _, _, mount_point = re.split(
+                "\s+", line, maxsplit=8
+            )
+            short_identifier = identifier[5:]
+            mount_info[short_identifier] = DiskSpaceInfo(
+                identifier=identifier,
+                size=int(size) * 512,
+                used_space=int(used) * 512,
+                free_space=int(free) * 512,
+                mount_point=mount_point,
+            )
+
+        self.devices: List[DeviceInfo] = []
+
+        diskutil_list = subprocess.check_output(
+            ["diskutil", "list"], universal_newlines=True
+        )
+        stanzas = diskutil_list.strip().split("\n\n")
+        for stanza in stanzas:
+            self.devices.extend(self._parse_stanza(stanza, mount_info))
+
+        # Add columns to the list control
+        columns = [
+            "Identifier",
+            "Type",
+            "Name",
+            "Size",
+            "Device status",
+            "Mount point",
+            "Used space",
+        ]
+
+        for index, col in enumerate(columns):
+            self.list_ctrl.InsertColumn(index, col, width=-1)
+
+        self.selected_index = -1
+
+        highlight = wx.Colour()
+        highlight.SetRGBA(0x18808080)
+        for index, line in enumerate(self.devices):
+            mount_point = ""
+            size_str = line.size
+            used_str = ""
+            if line.type in ("APFS Volume", "APFS Snapshot"):
+                used_str = size_str
+                size_str = "^"
+            disk_space = line.disk_space
+            if disk_space:
+                mount_point = disk_space.mount_point
+                used_str = humanize.naturalsize(disk_space.used_space)
+                if mount_point == "/":
+                    estimated_used = humanize.naturalsize(
+                        disk_space.size - disk_space.free_space
+                    )
+                    used_str = f"{estimated_used} (~)"
+
+            index = self.list_ctrl.InsertItem(
+                index, f"{'  ' * line.indent}{line.identifier}"
+            )
+            self.list_ctrl.SetItem(index, 1, line.type)
+            self.list_ctrl.SetItem(index, 2, line.name)
+            self.list_ctrl.SetItem(index, 3, size_str)
+            self.list_ctrl.SetItem(index, 4, line.status)
+            self.list_ctrl.SetItem(index, 5, mount_point)
+            self.list_ctrl.SetItem(index, 6, used_str)
+            self.list_ctrl.SetItemData(index, index)
+            if f"{PARAMS.source}" == mount_point:
+                self.list_ctrl.Select(index)
+                self.list_ctrl.Focus(index)
+                self.selected_index = index
+            if index % 2:
+                self.list_ctrl.SetItemBackgroundColour(index, highlight)
+            if not mount_point:
+                self.list_ctrl.SetItemTextColour(index, (128, 128, 128))
+
+        padding = 10
+        width = padding * 4
+        height = padding * 4
+        for index in range(len(columns)):
+            self.list_ctrl.SetColumnWidth(index, wx.LIST_AUTOSIZE)
+            # Add a bit of padding
+            padded_width = self.list_ctrl.GetColumnWidth(index) + padding
+            padded_width = max(padded_width, 100)
+            if index == 2:
+                padded_width = min(padded_width, 180)
+            self.list_ctrl.SetColumnWidth(index, padded_width)
+            width = width + padded_width
+
+        for index in range((self.list_ctrl.ItemCount)):
+            rect: wx.Rect = self.list_ctrl.GetItemRect(index)
+            height = height + rect.GetHeight()
+
+        self.list_ctrl.SetMinSize(wx.Size(width, height))
+
+        # Add controls to the sizer
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox.Add(title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
+        vbox.Add(devices_label, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 10)
+        vbox.Add((0, 10))
+        vbox.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, border=10)
+        panel.SetSizerAndFit(vbox)
+
+        sizer = wx.GridSizer(1)
+        sizer.Add(panel, 1, wx.EXPAND | wx.ALL)
+        self.SetSizerAndFit(sizer)
+
+        # The list control might become quite big, thus this line sets a
+        # reasonable minimum so the window can be reduced
+        self.SetMinSize(wx.Size(480, 240))
+
+    def on_item_focused(self, event):
+        index = event.GetIndex()
+        device: DeviceInfo = self.devices[index]
+        if device.disk_space and device.disk_space.mount_point:
+            self.selected_index = event.GetIndex()
+        else:
+            self.list_ctrl.Select(self.selected_index)
+            self.list_ctrl.Focus(self.selected_index)
+
+    def on_item_activated(self, event):
+        index = event.GetIndex()
+        device: DeviceInfo = self.devices[index]
+        if device.disk_space and device.disk_space.mount_point:
+            PARAMS.source = device.disk_space.mount_point
+            self.parent.source_picker.SetPath(device.disk_space.mount_point)
+            self.parent.source_picker.SetFocus()
+
+            # Clean up event listeners and close
+            self.list_ctrl.Unbind(wx.EVT_LIST_ITEM_FOCUSED, handler=self.on_item_focused)
+            self.list_ctrl.Unbind(wx.EVT_LIST_ITEM_ACTIVATED, handler=self.on_item_activated)
+            self.Close()
+        else:
+            self.list_ctrl.Select(self.selected_index)
+            self.list_ctrl.Focus(self.selected_index)
 
 
 class InputWindow(wx.Frame):
@@ -93,6 +314,9 @@ class InputWindow(wx.Frame):
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
+        # Add Devices button
+        devices_button = wx.Button(panel, label="List of drives and partitions")
+        devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
         tmp_label = wx.StaticText(panel, label="Temp image location:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
@@ -153,6 +377,8 @@ class InputWindow(wx.Frame):
         output_info.Add(self.output_text, 1, wx.EXPAND)
         output_info.Add(source_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.source_picker, 1, wx.EXPAND)
+        output_info.Add((0, 0))
+        output_info.Add(devices_button, 0, wx.EXPAND)
         output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.tmp_picker, 1, wx.EXPAND)
         output_info.Add(destination_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
@@ -177,6 +403,16 @@ class InputWindow(wx.Frame):
 
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
+
+    def on_open_devices(self, event):
+        devices_window = DevicesWindow(self)
+        devices_window.Show()
+
+    def on_tmp_location_changed(self, event):
+        temp_location = self.tmp_picker.GetPath()
+        destination_location = self.destination_picker.GetPath()
+        if not destination_location:
+            self.destination_picker.SetPath(temp_location)
 
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
