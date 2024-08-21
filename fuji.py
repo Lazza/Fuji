@@ -596,6 +596,7 @@ class ProcessingWindow(wx.Frame):
         # Layout
         vbox = wx.BoxSizer(wx.VERTICAL)
         vbox.Add(self.title, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 20)
+        vbox.Add((0, 10))
         vbox.Add(self.output_text, 1, wx.EXPAND | wx.ALL, 10)
 
         self.panel.SetSizer(vbox)
