@@ -260,8 +260,12 @@ class DevicesWindow(wx.Frame):
             self.parent.source_picker.SetFocus()
 
             # Clean up event listeners and close
-            self.list_ctrl.Unbind(wx.EVT_LIST_ITEM_FOCUSED, handler=self.on_item_focused)
-            self.list_ctrl.Unbind(wx.EVT_LIST_ITEM_ACTIVATED, handler=self.on_item_activated)
+            self.list_ctrl.Unbind(
+                wx.EVT_LIST_ITEM_FOCUSED, handler=self.on_item_focused
+            )
+            self.list_ctrl.Unbind(
+                wx.EVT_LIST_ITEM_ACTIVATED, handler=self.on_item_activated
+            )
             self.Close()
         else:
             self.list_ctrl.Select(self.selected_index)
