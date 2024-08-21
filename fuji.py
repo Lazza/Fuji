@@ -124,6 +124,7 @@ class DevicesWindow(wx.Frame):
         )
 
         self.list_ctrl = wx.ListCtrl(panel, style=wx.LC_REPORT | wx.BORDER_SUNKEN)
+        self.list_ctrl.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
 
         mount_info = {}
@@ -166,6 +167,8 @@ class DevicesWindow(wx.Frame):
         for index, col in enumerate(columns):
             self.list_ctrl.InsertColumn(index, col, width=-1)
 
+        self.selected_index = -1
+
         highlight = wx.Colour()
         highlight.SetRGBA(0x18808080)
         for index, line in enumerate(self.devices):
@@ -191,8 +194,12 @@ class DevicesWindow(wx.Frame):
             if f"{PARAMS.source}" == mount_point:
                 self.list_ctrl.Select(index)
                 self.list_ctrl.Focus(index)
+                self.selected_index = index
             if index % 2:
                 self.list_ctrl.SetItemBackgroundColour(index, highlight)
+            if not mount_point:
+                color: wx.Colour = self.list_ctrl.GetItemTextColour(index)
+                self.list_ctrl.SetItemTextColour(index, (128, 128, 128))
 
         padding = 10
         width = padding * 4
@@ -229,14 +236,30 @@ class DevicesWindow(wx.Frame):
         # reasonable minimum so the window can be reduced
         self.SetMinSize(wx.Size(480, 240))
 
+    def on_item_focused(self, event):
+        index = event.GetIndex()
+        device: DeviceInfo = self.devices[index]
+        if device.disk_space and device.disk_space.mount_point:
+            self.selected_index = event.GetIndex()
+        else:
+            self.list_ctrl.Select(self.selected_index)
+            self.list_ctrl.Focus(self.selected_index)
+
     def on_item_activated(self, event):
         index = event.GetIndex()
-        mounted = self.list_ctrl.GetItem(index, 5).GetText()
-        if mounted != "-":
-            PARAMS.source = mounted
-            self.parent.source_picker.SetPath(mounted)
+        device: DeviceInfo = self.devices[index]
+        if device.disk_space and device.disk_space.mount_point:
+            PARAMS.source = device.disk_space.mount_point
+            self.parent.source_picker.SetPath(device.disk_space.mount_point)
             self.parent.source_picker.SetFocus()
-        self.Close()
+
+            # Clean up event listeners and close
+            self.list_ctrl.Unbind(wx.EVT_LIST_ITEM_FOCUSED, handler=self.on_item_focused)
+            self.list_ctrl.Unbind(wx.EVT_LIST_ITEM_ACTIVATED, handler=self.on_item_activated)
+            self.Close()
+        else:
+            self.list_ctrl.Select(self.selected_index)
+            self.list_ctrl.Focus(self.selected_index)
 
 
 class InputWindow(wx.Frame):
