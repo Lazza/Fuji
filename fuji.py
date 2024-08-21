@@ -153,7 +153,7 @@ class DevicesWindow(wx.Frame):
         for stanza in stanzas:
             self.devices.extend(self._parse_stanza(stanza, mount_info))
 
-        # Add columns to the list control with a minimum width
+        # Add columns to the list control
         columns = [
             "Identifier",
             "Type",
@@ -205,7 +205,6 @@ class DevicesWindow(wx.Frame):
             if index % 2:
                 self.list_ctrl.SetItemBackgroundColour(index, highlight)
             if not mount_point:
-                color: wx.Colour = self.list_ctrl.GetItemTextColour(index)
                 self.list_ctrl.SetItemTextColour(index, (128, 128, 128))
 
         padding = 10
