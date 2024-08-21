@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 import os
-import plistlib
 import re
 import string
 import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import List
+from typing import Iterable, List
 
 import humanize
 import wx
@@ -57,6 +56,7 @@ class DiskSpaceInfo:
     identifier: str = ""
     size: int = 0
     used_space: int = 0
+    free_space: int = 0
     mount_point: str = ""
 
 
@@ -65,49 +65,47 @@ class DeviceInfo:
     indent: int = 0
     type: str = ""
     name: str = ""
+    size: str = ""
     identifier: str = ""
     status: str = ""
     disk_space: DiskSpaceInfo = None
 
 
 class DevicesWindow(wx.Frame):
-    def _fetch_info(self, device, mount_info: dict, indent=0) -> DeviceInfo:
-        device_type = device.get("Content", "")
-        identifier = device.get("DeviceIdentifier", "")
+    def _parse_stanza(self, stanza: str, mount_info: dict) -> Iterable[DeviceInfo]:
+        lines = stanza.splitlines()
+        first, second = lines[:2]
+        status = ""
+        if "(" in first:
+            status = first.split("(")[1].split(")")[0]
+        pivot_1 = second.index(":") + 1
+        pivot_2 = second.index(" NAME")
+        pivot_3 = second.index(" SIZE")
+        pivot_4 = second.index(" IDENTIFIER")
 
-        if device_type == "Apple_APFS_Container":
-            device_type = "APFS Container Scheme"
+        is_disk = True
+        for line in lines[2:]:
+            type = line[pivot_1 + 1 : pivot_2].strip()
+            name = line[pivot_2:pivot_3].strip()
+            size = line[pivot_3 + 1 : pivot_4].strip()
+            identifier = line[pivot_4:].strip()
+            if not identifier:
+                continue
+            indent = identifier[4:].count("s")
+            if identifier == "-":
+                indent = 1
+            device_info = DeviceInfo(
+                indent=indent,
+                type=type,
+                name=name,
+                size=size,
+                identifier=identifier,
+                status=status if is_disk else "",
+                disk_space=mount_info.get(identifier),
+            )
 
-        return DeviceInfo(
-            indent=indent,
-            type=device_type,
-            identifier=identifier,
-            disk_space=mount_info.get(identifier),
-        )
-
-    def _fetch_volume_info(
-        self, device, snapshots: dict, mount_info: dict
-    ) -> DeviceInfo:
-        indent = 1
-        device_type = "APFS Volume"
-        name = device.get("VolumeName", "")
-        size = device.get("Size", 0)
-        identifier = device.get("DeviceIdentifier", "")
-        mount_point = device.get("MountPoint", "")
-        used_space = device.get("CapacityInUse", 0)
-
-        if identifier in snapshots:
-            device_type = "APFS Snapshot"
-            name = snapshots[identifier]
-            indent = 2
-
-        return DeviceInfo(
-            indent=indent,
-            type=device_type,
-            name=name,
-            identifier=identifier,
-            disk_space=mount_info.get(identifier),
-        )
+            is_disk = False
+            yield device_info
 
     def __init__(self, parent):
         super().__init__(parent, title="Fuji - Drives and partitions")
@@ -133,7 +131,7 @@ class DevicesWindow(wx.Frame):
         for line in df_lines:
             if not line.startswith("/dev/disk"):
                 continue
-            identifier, size, used, _, _, _, _, _, mount_point = re.split(
+            identifier, size, used, free, _, _, _, _, mount_point = re.split(
                 "\s+", line, maxsplit=8
             )
             short_identifier = identifier[5:]
@@ -141,40 +139,18 @@ class DevicesWindow(wx.Frame):
                 identifier=identifier,
                 size=int(size) * 512,
                 used_space=int(used) * 512,
+                free_space=int(free) * 512,
                 mount_point=mount_point,
             )
 
-        plist_disks = subprocess.check_output(["diskutil", "list", "-plist"])
-        disks_data = plistlib.loads(plist_disks)
+        self.devices: List[DeviceInfo] = []
 
-        data: List[DeviceInfo] = []
-        skip_stores = []
-        snapshots = {}
-        for disk in disks_data.get("AllDisksAndPartitions", []):
-            stores = disk.get("APFSPhysicalStores", [])
-            if len(stores) and stores[0].get("DeviceIdentifier") in skip_stores:
-                continue
-
-            # One entry for the drive
-            data.append(self._fetch_info(disk, mount_info))
-
-            # One entry for each partition
-            for partition in disk.get("Partitions", []):
-                # Skip ISC and Recovery like macOS does
-                if partition.get("Content") in (
-                    "Apple_APFS_ISC",
-                    "Apple_APFS_Recovery",
-                ):
-                    skip_stores.append(partition.get("DeviceIdentifier"))
-                data.append(self._fetch_info(partition, mount_info, indent=1))
-
-            # One entry for each APFS volume
-            for volume in disk.get("APFSVolumes", []):
-                for snapshot in volume.get("MountedSnapshots", []):
-                    snapshots[snapshot.get("SnapshotBSD")] = snapshot.get(
-                        "SnapshotName"
-                    )
-                data.append(self._fetch_volume_info(volume, snapshots, mount_info))
+        diskutil_list = subprocess.check_output(
+            ["diskutil", "list"], universal_newlines=True
+        )
+        stanzas = diskutil_list.strip().split("\n\n")
+        for stanza in stanzas:
+            self.devices.extend(self._parse_stanza(stanza, mount_info))
 
         # Add columns to the list control with a minimum width
         columns = [
@@ -192,10 +168,10 @@ class DevicesWindow(wx.Frame):
 
         highlight = wx.Colour()
         highlight.SetRGBA(0x18808080)
-        for index, line in enumerate(data):
-            size_str = ''
-            mount_point = ''
-            used_str = ''
+        for index, line in enumerate(self.devices):
+            mount_point = ""
+            size_str = line.size
+            used_str = ""
             disk_space = line.disk_space
             if disk_space:
                 size_str = humanize.naturalsize(disk_space.size)
