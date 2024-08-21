@@ -416,6 +416,7 @@ class InputWindow(wx.Frame):
     def on_open_devices(self, event):
         devices_window = DevicesWindow(self)
         devices_window.Show()
+        devices_window.Move(64, 64)
 
     def on_tmp_location_changed(self, event):
         temp_location = self.tmp_picker.GetPath()
