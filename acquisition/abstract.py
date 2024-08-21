@@ -14,7 +14,7 @@ from subprocess import Popen
 from typing import IO, List, Tuple
 
 from meta import AUTHOR, VERSION
-from shared.utils import command_to_properties
+from shared.utils import command_to_properties, lines_to_properties
 
 
 @dataclass
@@ -175,7 +175,10 @@ class AcquisitionMethod(ABC):
 
         disk_device = ""
         if is_disk:
-            diskutil_info = command_to_properties(["diskutil", "info", f"{path}"])
+            disk_info = subprocess.check_output(
+                ["diskutil", "info", f"{path}"], universal_newlines=True
+            )
+            diskutil_info = lines_to_properties(disk_info.splitlines())
 
             valid = "Device Node" in diskutil_info
             if valid:
