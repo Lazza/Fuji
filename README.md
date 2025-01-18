@@ -13,6 +13,13 @@ DMG file that can be imported in several digital forensics programs.
 It is released under the terms of the GNU General Public License (version 3).
 
 
+## Download the latest version
+
+You can find the **latest DMG file** on the releases page:
+
+<a href="https://github.com/Lazza/Fuji/releases" role="button" style="display: inline-block; padding: 0.5em 1em; border-radius: 0.5em; color: #fff; background: #b54e4e; box-shadow: 0px 0.5px 1.5px rgba(127, 127, 127, 0.25), inset 0px 0.8px 0px -0.25px rgba(255, 255, 255, 0.2); text-decoration: none; cursor: pointer; font-size: 120%">Download Fuji</a>
+
+
 ## Drive preparation
 
 Please carefully follow the installation procedure:
