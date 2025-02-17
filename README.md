@@ -1,23 +1,46 @@
-![Fuji logo and screenshot](./packaging/banner.jpg)
+<div align="center">
 
-# Fuji: Forensic Unattended Juicy Imaging
+  <img width="256" src="./packaging/Fuji.png">
 
-Fuji is a free, open source software for performing forensic acquisition of Mac
+  <h1>Fuji: Forensic Unattended Juicy Imaging</h1>
+
+  <p><a class="badge-chip" href="https://github.com/Lazza/Fuji/blob/master/LICENSE.md"><img alt="GPL-3.0 license" src="https://badgen.net/github/license/Lazza/Fuji"></a>
+  <a class="badge-chip" href="https://github.com/Lazza/Fuji/releases"><img alt="Latest release" src="https://badgen.net/github/release/Lazza/Fuji"></a>
+  <a class="badge-chip" href="https://github.com/Lazza/Fuji/releases"><img alt="Downloads counter" src="https://badgen.net/github/assets-dl/Lazza/Fuji"></a>
+  <a class="badge-chip" href="https://project-types.github.io/#stadium"><img alt="Stadium badge" src="https://badgen.net/static/project type/stadium/orange"></a>
+  <a class="badge-chip" href="https://ko-fi.com/thelazza"><img alt="Donate on Ko-fi" src="https://badgen.net/static/ko-fi/donate/yellow"></a></p>
+
+  <h3>MacOS forensic acquisition made simple</h3>
+
+  <img width="484" src="./packaging/screenshot.png">
+
+</div>
+
+
+## About
+
+Fuji is a free, open source program for performing forensic acquisition of Mac
 computers. It should work on any modern Intel or Apple Silicon device, as it
 leverages standard executables provided by macOS.
 
 Fuji performs a so-called *live acquisition* (the computer must be turned on) of
-*logical* nature, i.e. it includes only existing files. The software generates a
-DMG file that can be imported in several digital forensics programs.
+*logical* nature, i.e. it includes only existing files. The tool generates a DMG
+file that can be imported in several digital forensics programs.
 
 It is released under the terms of the GNU General Public License (version 3).
+
+If you find my work in open source digital forensics valuable, please consider
+supporting it with a donation. Your contributions help sustain the development
+and maintenance of tools like Fuji.
+
+[![Donate on Ko-fi](https://badgen.net/static/Ko-fi/donate?color=e05958&icon=kofi&scale=2&labelColor=579fbf)](https://ko-fi.com/thelazza)
 
 
 ## Download the latest version
 
 You can find the **latest DMG file** on the releases page:
 
-**[Download Fuji][releases]**
+[![Download Fuji: DMG](https://badgen.net/static/Download%20Fuji/DMG/blue?icon=apple&scale=2)][releases]
 
 
 ## Drive preparation
@@ -109,7 +132,7 @@ The build process must be executed from a computer running macOS.
 
 The README file in RTF format can be generated with pandoc:
 
-    cat README.md | grep -v 'banner.jpg' | pandoc -f markdown -s -o dist/README.rtf
+    cat README.md | grep -v 'badge-chip' | pandoc -f markdown -s -o dist/README.rtf
 
 The following is a list of prerequisites if you want to modify the source code
 or run Fuji from source:
