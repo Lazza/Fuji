@@ -95,8 +95,8 @@ Fuji testers have reported that this generally solves the issue.
 
 ### ASR acquisition fails with error 49186 or 49197
 
-This has often been reported on macOS version 13 (Ventura). The APFS volume
-might need to be checked using the _SOS_ function of Disk Utility (`fsck`).
+This has often been reported on macOS version 13 (Ventura). The APFS volume may
+need to be checked using the _First Aid_ function of Disk Utility (`fsck`).
 
 If this does not work, try acquiring the **Macintosh HD - Data** volume instead.
 
