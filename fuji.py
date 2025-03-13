@@ -349,7 +349,7 @@ class InputWindow(wx.Frame):
             description_text.SetLabelMarkup(description_label)
             self.description_texts.append(description_text)
 
-        # Sound checkbox
+        # compressed dmg file checkbox
         self.compressed_checkbox = wx.CheckBox(
             panel, label="Create an un-compressed (raw) acquisition .dmg-file"
         )
