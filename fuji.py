@@ -350,6 +350,12 @@ class InputWindow(wx.Frame):
             self.description_texts.append(description_text)
 
         # Sound checkbox
+        self.compressed_checkbox = wx.CheckBox(
+            panel, label="Create an un-compressed (raw) acquisition .dmg-file"
+        )
+        self.compressed_checkbox.SetValue(False)
+
+        # Sound checkbox
         self.sound_checkbox = wx.CheckBox(
             panel, label="Play loud sound when acquisition is completed"
         )
@@ -402,6 +408,7 @@ class InputWindow(wx.Frame):
             vbox.Add(description_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         vbox.Add((0, 20))
+        vbox.Add(self.compressed_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
         panel.SetSizer(vbox)
@@ -449,6 +456,7 @@ class InputWindow(wx.Frame):
         PARAMS.tmp = Path(self.tmp_picker.GetPath().strip())
         PARAMS.destination = Path(self.destination_picker.GetPath().strip())
         PARAMS.sound = self.sound_checkbox.GetValue()
+        PARAMS.compressed = self.compressed_checkbox.GetValue()
         self.method = METHODS[self.method_choice.GetSelection()]
 
         self.Hide()
@@ -517,6 +525,7 @@ class OverviewWindow(wx.Frame):
             "Temp image location": PARAMS.tmp,
             "DMG destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
+            "Compressed Acquisition": "No" if PARAMS.compressed else "Yes",
             "Play sound": "Yes" if PARAMS.sound else "No",
         }
 

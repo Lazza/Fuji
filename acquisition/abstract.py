@@ -16,7 +16,6 @@ from typing import IO, List, Tuple
 from meta import AUTHOR, VERSION
 from shared.utils import command_to_properties, lines_to_properties
 
-
 @dataclass
 class Parameters:
     case: str = ""
@@ -306,8 +305,12 @@ class AcquisitionMethod(ABC):
         print("\nConverting", self.temporary_path, "->", self.output_path)
         sparseimage = f"{self.temporary_path}"
         dmg = f"{self.output_path}"
+        if params.compressed:
+            dmgformat = "UDRO"
+        else:
+            dmgformat = "UDZO"
         result = self._run_status(
-            ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
+            ["hdiutil", "convert", sparseimage, "-format", dmgformat, "-o", dmg]
         )
 
         success = result == 0
