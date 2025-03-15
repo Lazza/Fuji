@@ -84,7 +84,7 @@ class AcquisitionMethod(ABC):
             return ""
 
     def _create_shell_process(
-        self, arguments: List[str], awake=True, tee: Path = None
+            self, arguments: List[str], awake=True, tee: Path = None
     ) -> Popen[str]:
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
@@ -111,7 +111,7 @@ class AcquisitionMethod(ABC):
         return p.returncode, p.stdout
 
     def _run_process(
-        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+            self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
     ) -> Tuple[int, str]:
         # Run a process in plain sight. Return its status code and output.
         p = self._create_shell_process(arguments, awake=awake, tee=tee)
@@ -135,7 +135,7 @@ class AcquisitionMethod(ABC):
         return p.returncode, output
 
     def _run_status(
-        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+            self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
     ) -> int:
         # Run a process in plain sight. Return its status code.
         p = self._create_shell_process(arguments, awake=awake, tee=tee)
@@ -263,11 +263,11 @@ class AcquisitionMethod(ABC):
         success = result == 0 and len(volume_lines) > 0
         if success:
             container_line = container_lines[0]
-            parts = re.split("\s+", container_line, maxsplit=2)
+            parts = re.split(r"\s+", container_line, maxsplit=2)
             self.temporary_container = parts[0]
 
             mount_line = volume_lines[0]
-            parts = re.split("\s+", mount_line, maxsplit=2)
+            parts = re.split(r"\s+", mount_line, maxsplit=2)
             self.temporary_volume = parts[0]
             self.temporary_mount = parts[2]
 
@@ -276,6 +276,20 @@ class AcquisitionMethod(ABC):
             self._write_report(report)
 
         return success
+
+    def _delete_temporary_image(self, report: Report) -> bool:
+        params = report.parameters
+        output_directory = params.tmp / params.image_name
+        self.temporary_path = output_directory / f"{params.image_name}.sparseimage"
+        if os.path.exists(self.temporary_path):
+            if params.state_temporary_image:
+                try:
+                    os.remove(self.temporary_path)
+                    print(f"Temporary image file {self.temporary_path} deleted.")
+                    return True
+                except Exception as e:
+                   print(f"Error while delete temporary image file {self.temporary_path}: {e}")
+        print(f"{self.temporary_path}")
 
     def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
         print("\nWaiting to detach temporary image...")
@@ -306,7 +320,7 @@ class AcquisitionMethod(ABC):
         sparseimage = f"{self.temporary_path}"
         dmg = f"{self.output_path}"
         if params.compressed:
-            dmgformat = "UDRO"
+            dmgformat = "UDRW"
         else:
             dmgformat = "UDZO"
         result = self._run_status(
@@ -376,9 +390,9 @@ class AcquisitionMethod(ABC):
         output_files = []
         if len(report.output_files):
             output_files = [
-                separator,
-                "Generated files:",
-            ] + [f"    - {file}" for file in report.output_files]
+                               separator,
+                               "Generated files:",
+                           ] + [f"    - {file}" for file in report.output_files]
 
         hashes = []
         if report.result:
@@ -392,28 +406,30 @@ class AcquisitionMethod(ABC):
 
         with open(self.output_report, "w") as output:
             for line in (
-                [
-                    "Fuji - Forensic Unattended Juicy Imaging",
-                    f"Version {VERSION} by {AUTHOR}",
-                    "Acquisition log",
-                    separator,
-                    f"Case name: {report.parameters.case}",
-                    f"Examiner: {report.parameters.examiner}",
-                    f"Notes: {report.parameters.notes}",
-                    separator,
-                    f"Start time: {report.start_time}",
-                    f"End time: {report.end_time}",
-                    f"Source: {report.parameters.source}",
-                    f"Acquisition method: {report.method.name}",
-                    separator,
-                    report.hardware_info,
-                    separator,
-                    "Volume:",
-                    "",
-                    report.path_details.disk_info,
-                ]
-                + output_files
-                + hashes
+                    [
+                        "Fuji - Forensic Unattended Juicy Imaging",
+                        f"Version {VERSION} by {AUTHOR}",
+                        "Acquisition log",
+                        separator,
+                        f"Case name: {report.parameters.case}",
+                        f"Examiner: {report.parameters.examiner}",
+                        f"Notes: {report.parameters.notes}",
+                        separator,
+                        f"Start time: {report.start_time}",
+                        f"End time: {report.end_time}",
+                        f"Source: {report.parameters.source}",
+                        f"Acquisition method: {report.method.name}",
+                        f"Imagefile type: {'uncompressed (UDRW)' if report.parameters.compressed else 'compressed (UDZO)'}",
+                        f"temporary image file: {'delete' if report.parameters.state_temporary_image else 'keep'} after acquisition",
+                        separator,
+                        report.hardware_info,
+                        separator,
+                        "Volume:",
+                        "",
+                        report.path_details.disk_info,
+                    ]
+                    + output_files
+                    + hashes
             ):
                 output.write(line + "\n")
 
@@ -431,8 +447,10 @@ class AcquisitionMethod(ABC):
         report.success = True
         report.end_time = datetime.now()
 
-        self._write_report(report)
+        _ = self._delete_temporary_image(report)
 
+        self._write_report(report)
+        
         print("\nAcquisition completed!")
         return report
 

@@ -133,7 +133,7 @@ class DevicesWindow(wx.Frame):
             if not line.startswith("/dev/disk"):
                 continue
             identifier, size, used, free, _, _, _, _, mount_point = re.split(
-                "\s+", line, maxsplit=8
+                r"\s+", line, maxsplit=8
             )
             short_identifier = identifier[5:]
             mount_info[short_identifier] = DiskSpaceInfo(
@@ -351,9 +351,15 @@ class InputWindow(wx.Frame):
 
         # compressed dmg file checkbox
         self.compressed_checkbox = wx.CheckBox(
-            panel, label="Create an un-compressed (raw) acquisition .dmg-file"
+            panel, label="Create an un-compressed (UDRW) acquisition .dmg-file"
         )
         self.compressed_checkbox.SetValue(False)
+
+        # keep/delete temporary sparseimage file after acquisition
+        self.state_temporary_image_checkbox = wx.CheckBox(
+            panel, label="Delete temporary image file after acquisition"
+        )
+        self.state_temporary_image_checkbox.SetValue(False)
 
         # Sound checkbox
         self.sound_checkbox = wx.CheckBox(
@@ -409,6 +415,7 @@ class InputWindow(wx.Frame):
 
         vbox.Add((0, 20))
         vbox.Add(self.compressed_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+        vbox.Add(self.state_temporary_image_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
         panel.SetSizer(vbox)
@@ -457,6 +464,7 @@ class InputWindow(wx.Frame):
         PARAMS.destination = Path(self.destination_picker.GetPath().strip())
         PARAMS.sound = self.sound_checkbox.GetValue()
         PARAMS.compressed = self.compressed_checkbox.GetValue()
+        PARAMS.state_temporary_image = self.state_temporary_image_checkbox.GetValue()
         self.method = METHODS[self.method_choice.GetSelection()]
 
         self.Hide()
@@ -525,7 +533,8 @@ class OverviewWindow(wx.Frame):
             "Temp image location": PARAMS.tmp,
             "DMG destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
-            "Compressed Acquisition": "No" if PARAMS.compressed else "Yes",
+            "Imagefile type": "uncompressed (UDRW)" if PARAMS.compressed else "compressed (UDZO)",
+            "Temporary image file": f"{'delete' if PARAMS.state_temporary_image else 'keep'} after acquisition",
             "Play sound": "Yes" if PARAMS.sound else "No",
         }
 
