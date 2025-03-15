@@ -406,30 +406,30 @@ class AcquisitionMethod(ABC):
 
         with open(self.output_report, "w") as output:
             for line in (
-                    [
-                        "Fuji - Forensic Unattended Juicy Imaging",
-                        f"Version {VERSION} by {AUTHOR}",
-                        "Acquisition log",
-                        separator,
-                        f"Case name: {report.parameters.case}",
-                        f"Examiner: {report.parameters.examiner}",
-                        f"Notes: {report.parameters.notes}",
-                        separator,
-                        f"Start time: {report.start_time}",
-                        f"End time: {report.end_time}",
-                        f"Source: {report.parameters.source}",
-                        f"Acquisition method: {report.method.name}",
-                        f"Imagefile type: {'uncompressed (UDRW)' if report.parameters.compressed else 'compressed (UDZO)'}",
-                        f"temporary image file: {'delete' if report.parameters.state_temporary_image else 'keep'} after acquisition",
-                        separator,
-                        report.hardware_info,
-                        separator,
-                        "Volume:",
-                        "",
-                        report.path_details.disk_info,
-                    ]
-                    + output_files
-                    + hashes
+                [
+                    "Fuji - Forensic Unattended Juicy Imaging",
+                    f"Version {VERSION} by {AUTHOR}",
+                    "Acquisition log",
+                    separator,
+                    f"Case name: {report.parameters.case}",
+                    f"Examiner: {report.parameters.examiner}",
+                    f"Notes: {report.parameters.notes}",
+                    separator,
+                    f"Start time: {report.start_time}",
+                    f"End time: {report.end_time}",
+                    f"Source: {report.parameters.source}",
+                    f"Acquisition method: {report.method.name}",
+                    f"Imagefile type: {'uncompressed (UDRW)' if report.parameters.compressed else 'compressed (UDZO)'}",
+                    f"temporary image file: {'delete' if report.parameters.state_temporary_image else 'keep'} after acquisition",
+                    separator,
+                    report.hardware_info,
+                    separator,
+                    "Volume:",
+                    "",
+                    report.path_details.disk_info,
+                ]
+                + output_files
+                + hashes
             ):
                 output.write(line + "\n")
 
