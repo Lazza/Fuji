@@ -390,9 +390,9 @@ class AcquisitionMethod(ABC):
         output_files = []
         if len(report.output_files):
             output_files = [
-                               separator,
-                               "Generated files:",
-                           ] + [f"    - {file}" for file in report.output_files]
+                separator,
+                "Generated files:",
+            ] + [f"    - {file}" for file in report.output_files]
 
         hashes = []
         if report.result:
