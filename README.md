@@ -29,6 +29,28 @@ file that can be imported in several digital forensics programs.
 
 It is released under the terms of the GNU General Public License (version 3).
 
+
+## Supporters and friends
+
+The development of Fuji is empowered by the support of:
+
+<table>
+    <tr>
+        <td width="1280" align="center" vertical-align="center">
+            <p>
+                <a href="https://training.13cubed.com">
+                    <img width="459" src="./packaging/supporters/13Cubed.svg">
+                </a>
+            </p>
+            <p>
+                <b>13Cubed</b><br>
+                <a href="https://training.13cubed.com">https://training.13cubed.com</a><br>
+                High quality digital forensics and information security training
+            </p>
+            </td>
+    </tr>
+</table>
+
 If you find my work in open source digital forensics valuable, please consider
 supporting it with a donation. Your contributions help sustain the development
 and maintenance of tools like Fuji.
