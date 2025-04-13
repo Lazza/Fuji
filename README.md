@@ -84,6 +84,14 @@ Please carefully follow the installation procedure:
 5. Now you can run _Fuji.app_
 6. When prompted, insert the password for the administrator user
 
+The following video shows the entire acquisition process, step by step:
+
+<a href="https://www.youtube.com/watch?v=9bEiizjySHA">
+    <img src="./packaging/supporters/fuji-video.png" width="480">
+</a>
+
+_[Getting Started with Fuji - The Logical Choice for Mac Imaging](https://www.youtube.com/watch?v=9bEiizjySHA) on YouTube_
+
 ### Important notes
 
 1. Before starting the acquisition, you must specify on what drive(s) you want
