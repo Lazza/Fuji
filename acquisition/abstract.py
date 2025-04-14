@@ -16,7 +16,6 @@ from typing import IO, List, Tuple
 from meta import AUTHOR, VERSION
 from shared.utils import command_to_properties, lines_to_properties
 
-
 @dataclass
 class Parameters:
     case: str = ""
@@ -264,11 +263,11 @@ class AcquisitionMethod(ABC):
         success = result == 0 and len(volume_lines) > 0
         if success:
             container_line = container_lines[0]
-            parts = re.split("\s+", container_line, maxsplit=2)
+            parts = re.split(r"\s+", container_line, maxsplit=2)
             self.temporary_container = parts[0]
 
             mount_line = volume_lines[0]
-            parts = re.split("\s+", mount_line, maxsplit=2)
+            parts = re.split(r"\s+", mount_line, maxsplit=2)
             self.temporary_volume = parts[0]
             self.temporary_mount = parts[2]
 
@@ -277,6 +276,20 @@ class AcquisitionMethod(ABC):
             self._write_report(report)
 
         return success
+
+    def _delete_temporary_image(self, report: Report) -> bool:
+        params = report.parameters
+        output_directory = params.tmp / params.image_name
+        self.temporary_path = output_directory / f"{params.image_name}.sparseimage"
+        if os.path.exists(self.temporary_path):
+            if params.state_temporary_image:
+                try:
+                    os.remove(self.temporary_path)
+                    print(f"Temporary image file {self.temporary_path} deleted.")
+                    return True
+                except Exception as e:
+                   print(f"Error while delete temporary image file {self.temporary_path}: {e}")
+        print(f"{self.temporary_path}")
 
     def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
         print("\nWaiting to detach temporary image...")
@@ -306,8 +319,12 @@ class AcquisitionMethod(ABC):
         print("\nConverting", self.temporary_path, "->", self.output_path)
         sparseimage = f"{self.temporary_path}"
         dmg = f"{self.output_path}"
+        if params.compressed:
+            dmgformat = "UDRW"
+        else:
+            dmgformat = "UDZO"
         result = self._run_status(
-            ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
+            ["hdiutil", "convert", sparseimage, "-format", dmgformat, "-o", dmg]
         )
 
         success = result == 0
@@ -402,6 +419,8 @@ class AcquisitionMethod(ABC):
                     f"End time: {report.end_time}",
                     f"Source: {report.parameters.source}",
                     f"Acquisition method: {report.method.name}",
+                    f"Imagefile type: {'uncompressed (UDRW)' if report.parameters.compressed else 'compressed (UDZO)'}",
+                    f"temporary image file: {'delete' if report.parameters.state_temporary_image else 'keep'} after acquisition",
                     separator,
                     report.hardware_info,
                     separator,
@@ -428,8 +447,10 @@ class AcquisitionMethod(ABC):
         report.success = True
         report.end_time = datetime.now()
 
-        self._write_report(report)
+        _ = self._delete_temporary_image(report)
 
+        self._write_report(report)
+        
         print("\nAcquisition completed!")
         return report
 
