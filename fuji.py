@@ -426,7 +426,10 @@ class InputWindow(wx.Frame):
 
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
-        valid_characters = "-_" + string.ascii_letters + string.digits
+        valid_characters = "-_." + string.ascii_letters + string.digits
+
+        if self.output_text.Value.endswith(".ap") and chr(key) == 'p':
+            return False
 
         if chr(key) in valid_characters:
             event.Skip()
