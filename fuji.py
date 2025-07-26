@@ -16,6 +16,7 @@ from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
 from acquisition.rsync import RsyncMethod
 from acquisition.sysdiagnose import SysdiagnoseMethod
+from checks.name import NameCheck
 from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
@@ -23,7 +24,7 @@ from meta import AUTHOR, HOMEPAGE, VERSION
 from shared.utils import command_to_properties, lines_to_properties
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
-CHECKS = [FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
+CHECKS = [NameCheck(), FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
 PARAMS = Parameters()
 
 INPUT_WINDOW: "InputWindow"
@@ -427,9 +428,6 @@ class InputWindow(wx.Frame):
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
         valid_characters = "-_." + string.ascii_letters + string.digits
-
-        if self.output_text.Value.endswith(".ap") and chr(key) == 'p':
-            return False
 
         if chr(key) in valid_characters:
             event.Skip()
