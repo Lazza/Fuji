@@ -14,6 +14,7 @@ from subprocess import Popen
 from typing import IO, List, Tuple
 
 from meta import AUTHOR, VERSION
+from shared.environment import RECOVERY, SOURCE_PATH
 from shared.utils import command_to_properties, lines_to_properties
 
 
@@ -23,10 +24,10 @@ class Parameters:
     examiner: str = ""
     notes: str = ""
     image_name: str = "Mac_Acquisition"
-    source: Path = Path("/")
+    source: Path = Path(SOURCE_PATH)
     tmp: Path = Path("/Volumes/Fuji")
     destination: Path = Path("/Volumes/Fuji")
-    sound: bool = True
+    sound: bool = not RECOVERY
 
 
 @dataclass

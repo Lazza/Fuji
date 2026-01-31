@@ -21,6 +21,7 @@ from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
+from shared.environment import RECOVERY
 from shared.utils import command_to_properties, lines_to_properties
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
@@ -354,7 +355,7 @@ class InputWindow(wx.Frame):
         self.sound_checkbox = wx.CheckBox(
             panel, label="Play loud sound when acquisition is completed"
         )
-        self.sound_checkbox.SetValue(True)
+        self.sound_checkbox.SetValue(PARAMS.sound)
 
         # Buttons
         continue_btn = wx.Button(panel, label="Continue")
@@ -403,7 +404,11 @@ class InputWindow(wx.Frame):
             vbox.Add(description_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         vbox.Add((0, 20))
-        vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+        if not RECOVERY:
+            vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+        else:
+            self.sound_checkbox.Hide()
+
         vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
         panel.SetSizer(vbox)
 
@@ -518,8 +523,9 @@ class OverviewWindow(wx.Frame):
             "Temp image location": PARAMS.tmp,
             "DMG destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
-            "Play sound": "Yes" if PARAMS.sound else "No",
         }
+        if not RECOVERY:
+            data["Play sound"] = "Yes" if PARAMS.sound else "No"
 
         max_text_width = 600
 
