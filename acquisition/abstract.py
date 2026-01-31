@@ -164,9 +164,14 @@ class AcquisitionMethod(ABC):
         return "/dev/disk" + chunk
 
     def _find_mount_point(self, path: Path) -> Path:
-        path = os.path.realpath(path)
-        while not os.path.ismount(path):
-            path = os.path.dirname(path)
+        path = Path(os.path.realpath(path))
+        while not path.is_mount():
+            path = path.parent
+
+        # Special case for avoiding bugs in recovery environment
+        if RECOVERY and len(path.parts) > 3 and path.parts[1] == "Volumes":
+            path = path.parent
+
         return path
 
     def _gather_path_info(self, path: Path) -> PathDetails:
