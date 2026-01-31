@@ -160,10 +160,6 @@ The DMG file can be built by using the included Pyinstaller script:
 
 The build process must be executed from a computer running macOS.
 
-The README file in RTF format can be generated with pandoc:
-
-    cat README.md | grep -v 'badge-chip' | pandoc -f markdown -s -o dist/README.rtf
-
 The following is a list of prerequisites if you want to modify the source code
 or run Fuji from source:
 
