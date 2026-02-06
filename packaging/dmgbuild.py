@@ -5,16 +5,19 @@ from pathlib import Path
 project_directory = Path(os.getcwd())
 dist_directory = project_directory / "dist"
 pack_directory = project_directory / "packaging"
+recovery_directory = project_directory / "recovery"
 
 # File names
 settings_file = "Full Disk Access Settings.url"
 fuji_app_file = "Fuji.app"
 license_file = "LICENSE.rtf"
+physical_media_file = ".IAPhysicalMedia"
 
 files = [
     str(pack_directory / settings_file),
     str(dist_directory / fuji_app_file),
     str(pack_directory / license_file),
+    str(recovery_directory / physical_media_file),
 ]
 icon_locations = {
     settings_file: (128, 128),

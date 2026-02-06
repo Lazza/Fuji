@@ -5,7 +5,7 @@ import subprocess
 import sys
 from os import remove
 from pathlib import Path
-from shutil import copy, move
+from shutil import copy, copytree, move
 
 import dmgbuild
 
@@ -63,7 +63,11 @@ app = BUNDLE(
     version=meta.VERSION,
 )
 
-executable_path = Path("./dist/Fuji.app/Contents/MacOS")
+# Add language file for recovery environment
+app_bundle_path = Path("./dist/Fuji.app")
+copytree("./recovery/en.lproj", app_bundle_path / "Contents" / "Resources" / "en.lproj")
+
+executable_path = app_bundle_path / "Contents" / "MacOS"
 move(executable_path / "Fuji", executable_path / "Fuji.bin")
 copy("./packaging/Fuji.sh", executable_path / "Fuji")
 
