@@ -21,7 +21,11 @@ icon_locations = {
     fuji_app_file: (320, 128),
     license_file: (512, 128),
 }
-badge_icon = str(pack_directory / "Fuji.icns")
+icon = str(pack_directory / "FujiApp.icns")
 left_bottom_coordinates = (200, 300)
 width_height = (640, 480)
 window_rect = (left_bottom_coordinates, width_height)
+
+# RW format for temporary DMG
+format = "UDRW"
+shrink = False

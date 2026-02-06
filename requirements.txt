@@ -1,4 +1,4 @@
-dmgbuild[badge_icons]==1.6.1
+dmgbuild @ git+https://github.com/dmgbuild/dmgbuild/@75c8a6c7835c5b73dfd4510d92a8f357f93a5fbf
 humanize==4.9.0
 pyinstaller==6.6.0
 wxPython==4.2.0
