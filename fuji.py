@@ -284,6 +284,7 @@ class DevicesWindow(wx.Frame):
 class InputWindow(wx.Frame):
     method: AcquisitionMethod
     devices_window: Optional["DevicesWindow"] = None
+    description_labels: List[str] = []
 
     def __init__(self):
         super().__init__(
@@ -344,15 +345,13 @@ class InputWindow(wx.Frame):
             self.destination_picker.SetPath(str(PARAMS.destination))
         method_label = wx.StaticText(panel, label="Acquisition method:")
         self.method_choice = wx.Choice(panel, choices=[m.name for m in METHODS])
+        self.method_choice.Bind(wx.EVT_CHOICE, self.on_method_changed)
         self.method_choice.SetSelection(0)
 
         # Prepare method descriptions
-        self.description_texts = []
         for method in METHODS:
             description_label = f"<b>{method.name}:</b> {method.description}"
-            description_text = wx.StaticText(panel)
-            description_text.SetLabelMarkup(description_label)
-            self.description_texts.append(description_text)
+            self.description_labels.append(description_label)
 
         # Sound checkbox
         self.sound_checkbox = wx.CheckBox(
@@ -403,8 +402,9 @@ class InputWindow(wx.Frame):
 
         vbox.Add(output_info, 0, wx.EXPAND | wx.ALL, 10)
 
-        for description_text in self.description_texts:
-            vbox.Add(description_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.method_description = wx.StaticText(panel)
+        vbox.Add(self.method_description, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.describe_method(0)
 
         vbox.Add((0, 20))
         if not RECOVERY:
@@ -444,6 +444,15 @@ class InputWindow(wx.Frame):
         destination_location = self.destination_picker.GetPath()
         if not destination_location:
             self.destination_picker.SetPath(temp_location)
+
+    def on_method_changed(self, event):
+        method_index = self.method_choice.GetSelection()
+        self.describe_method(method_index)
+
+    def describe_method(self, index: int):
+        if index < len(self.description_labels):
+            self.method_description.SetLabelMarkup(self.description_labels[index])
+        self.Fit()
 
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
