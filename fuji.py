@@ -283,6 +283,7 @@ class DevicesWindow(wx.Frame):
 
 class InputWindow(wx.Frame):
     method: AcquisitionMethod
+    devices_window: Optional["DevicesWindow"] = None
 
     def __init__(self):
         super().__init__(
@@ -419,14 +420,24 @@ class InputWindow(wx.Frame):
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(panel)
         self.SetSizerAndFit(sizer)
+        self.Center()
 
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
 
     def on_open_devices(self, event):
-        devices_window = DevicesWindow(self)
-        devices_window.Show()
-        devices_window.Move(64, 64)
+        if self.devices_window is not None:
+            self.devices_window.Raise()
+            return
+        self.devices_window = DevicesWindow(self)
+        self.devices_window.Show()
+        self.devices_window.CenterOnParent()
+        self.devices_window.Bind(wx.EVT_CLOSE, self.on_close_devices)
+
+    def on_close_devices(self, event):
+        if self.devices_window:
+            self.devices_window.Destroy()
+        self.devices_window = None
 
     def on_tmp_location_changed(self, event):
         temp_location = self.tmp_picker.GetPath()
@@ -509,6 +520,7 @@ class OverviewWindow(wx.Frame):
         vbox.Add(hbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
 
         panel.SetSizer(vbox)
+        self.Center()
         self.panel = panel
 
         # Bind close
@@ -611,6 +623,7 @@ class ProcessingWindow(wx.Frame):
         vbox.Add(self.output_text, 1, wx.EXPAND | wx.ALL, 10)
 
         self.panel.SetSizer(vbox)
+        self.Center()
 
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
