@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
+from shared.environment import RSYNC_PATH
 
 
 class RsyncMethod(AcquisitionMethod):
@@ -52,7 +53,7 @@ class RsyncMethod(AcquisitionMethod):
         source_str = f"{params.source}"
         if not source_str.endswith("/"):
             source_str = source_str + "/"
-        command = ["rsync", "-xrlptgoEv", "--progress"]
+        command = [RSYNC_PATH, "-xrlptgoEv", "--progress"]
         for exclusion in exclusions:
             command.extend(["--exclude", f"{exclusion}/"])
         command.extend([source_str, self.temporary_mount])
