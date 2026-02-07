@@ -31,4 +31,5 @@ window_rect = (left_bottom_coordinates, width_height)
 
 # RW format for temporary DMG
 format = "UDRW"
+size = "200m"
 shrink = False
