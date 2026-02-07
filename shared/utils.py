@@ -17,3 +17,10 @@ def command_to_properties(
 ) -> dict:
     output = subprocess.check_output(arguments, universal_newlines=True)
     return lines_to_properties(output.splitlines(), separator, strip_chars)
+
+
+def dedent(text: str) -> str:
+    lines = text.splitlines()
+    if not lines:
+        return text
+    return "\n".join(line.strip() for line in lines)

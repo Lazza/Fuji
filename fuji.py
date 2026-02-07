@@ -22,7 +22,7 @@ from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 from shared.environment import RECOVERY
-from shared.utils import command_to_properties, lines_to_properties
+from shared.utils import command_to_properties, dedent, lines_to_properties
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
 CHECKS = [NameCheck(), FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
@@ -350,7 +350,7 @@ class InputWindow(wx.Frame):
 
         # Prepare method descriptions
         for method in METHODS:
-            description_label = f"<b>{method.name}:</b> {method.description}"
+            description_label = f"<b>{method.name}:</b> {dedent(method.description)}"
             self.description_labels.append(description_label)
 
         # Sound checkbox
@@ -402,8 +402,8 @@ class InputWindow(wx.Frame):
 
         vbox.Add(output_info, 0, wx.EXPAND | wx.ALL, 10)
 
-        self.method_description = wx.StaticText(panel)
-        vbox.Add(self.method_description, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.method_description = wx.StaticText(panel, style=wx.ALIGN_CENTRE_HORIZONTAL)
+        vbox.Add(self.method_description, 0, wx.EXPAND | wx.BOTTOM, 10)
         self.describe_method(0)
 
         vbox.Add((0, 20))
@@ -452,6 +452,7 @@ class InputWindow(wx.Frame):
     def describe_method(self, index: int):
         if index < len(self.description_labels):
             self.method_description.SetLabelMarkup(self.description_labels[index])
+        self.Layout()
         self.Fit()
 
     def _validate_image_name(self, event):
