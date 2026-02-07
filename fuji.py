@@ -288,7 +288,7 @@ class InputWindow(wx.Frame):
         super().__init__(
             parent=None,
             title="Fuji - Forensic Unattended Juicy Imaging",
-            size=(600, 400),
+            size=(540, 400),
             style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
         self.EnableMaximizeButton(False)
@@ -412,6 +412,8 @@ class InputWindow(wx.Frame):
             self.sound_checkbox.Hide()
 
         vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
+
+        vbox.SetMinSize(wx.Size(540, 0))
         panel.SetSizer(vbox)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
