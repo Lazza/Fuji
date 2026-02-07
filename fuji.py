@@ -6,7 +6,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 import humanize
 import wx
@@ -70,11 +70,13 @@ class DeviceInfo:
     size: str = ""
     identifier: str = ""
     status: str = ""
-    disk_space: DiskSpaceInfo = None
+    disk_space: Optional[DiskSpaceInfo] = None
 
 
 class DevicesWindow(wx.Frame):
-    def _parse_stanza(self, stanza: str, mount_info: dict) -> Iterable[DeviceInfo]:
+    def _parse_stanza(
+        self, stanza: str, mount_info: dict[str, DiskSpaceInfo]
+    ) -> Iterable[DeviceInfo]:
         lines = stanza.splitlines()
         first, second = lines[:2]
         status = ""
@@ -129,7 +131,7 @@ class DevicesWindow(wx.Frame):
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
 
-        mount_info = {}
+        mount_info: dict[str, DiskSpaceInfo] = {}
         df_lines = subprocess.check_output(["df"], universal_newlines=True).splitlines()
         for line in df_lines:
             if not line.startswith("/dev/disk"):
@@ -137,7 +139,7 @@ class DevicesWindow(wx.Frame):
             identifier, size, used, free, _, _, _, _, mount_point = re.split(
                 "\s+", line, maxsplit=8
             )
-            short_identifier = identifier[5:]
+            short_identifier: str = identifier[5:]
             mount_info[short_identifier] = DiskSpaceInfo(
                 identifier=identifier,
                 size=int(size) * 512,
@@ -263,7 +265,7 @@ class DevicesWindow(wx.Frame):
         index = event.GetIndex()
         device: DeviceInfo = self.devices[index]
         if device.disk_space and device.disk_space.mount_point:
-            PARAMS.source = device.disk_space.mount_point
+            PARAMS.source = Path(device.disk_space.mount_point)
             self.parent.source_picker.SetPath(device.disk_space.mount_point)
             self.parent.source_picker.SetFocus()
 
@@ -654,9 +656,8 @@ class ProcessingWindow(wx.Frame):
             ["osascript", "-e", "get volume settings"], universal_newlines=True
         )
         volume_properties = lines_to_properties(volume_settings.split(","))
-        try:
-            current_volume = int(volume_properties.get("output volume"))
-        except:
+        current_volume = int(volume_properties.get("output volume", -1))
+        if current_volume < 0:
             # Keep reasonable volume
             current_volume = 50
         scaled = MAX_VOLUME * (current_volume / 100.0)
