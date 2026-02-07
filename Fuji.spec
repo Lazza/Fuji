@@ -13,7 +13,7 @@ sys.path.insert(0, ".")
 meta = importlib.import_module("meta")
 
 
-a = Analysis(
+a = Analysis( # type: ignore
     ["fuji.py"],
     pathex=[],
     binaries=[],
@@ -26,9 +26,9 @@ a = Analysis(
     noarchive=False,
     optimize=0,
 )
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure) # type: ignore
 
-exe = EXE(
+exe = EXE( # type: ignore
     pyz,
     a.scripts,
     [],
@@ -46,7 +46,7 @@ exe = EXE(
     entitlements_file=None,
     icon=["packaging/Fuji.icns"],
 )
-coll = COLLECT(
+coll = COLLECT( # type: ignore
     exe,
     a.binaries,
     a.datas,
@@ -55,7 +55,7 @@ coll = COLLECT(
     upx_exclude=[],
     name="Fuji",
 )
-app = BUNDLE(
+app = BUNDLE( # type: ignore
     coll,
     name="Fuji.app",
     icon="./packaging/Fuji.icns",
