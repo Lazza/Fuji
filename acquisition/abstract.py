@@ -118,18 +118,19 @@ class AcquisitionMethod(ABC):
         # Run a process in plain sight. Return its status code and output.
         p = self._create_shell_process(arguments, awake=awake, tee=tee)
 
-        encoding = p.stdout.encoding
+        stdout: IO[str] = p.stdout # type: ignore
+        encoding: str = stdout.encoding # type: ignore
         output = ""
         while True:
             # Let it breathe and avoid the UI getting stuck
             time.sleep(0.1)
-            out = self._limited_read(p.stdout, buffer_size, encoding)
+            out = self._limited_read(stdout, buffer_size, encoding)
             if out:
                 sys.stdout.write(out)
                 output = output + out
 
             if p.poll() != None:
-                out = p.stdout.read()
+                out = stdout.read()
                 sys.stdout.write(out)
                 output = output + out
                 break
@@ -142,16 +143,17 @@ class AcquisitionMethod(ABC):
         # Run a process in plain sight. Return its status code.
         p = self._create_shell_process(arguments, awake=awake, tee=tee)
 
-        encoding = p.stdout.encoding
+        stdout: IO[str] = p.stdout # type: ignore
+        encoding: str = stdout.encoding # type: ignore
         while True:
             # Let it breathe and avoid the UI getting stuck
             time.sleep(0.1)
-            out = self._limited_read(p.stdout, buffer_size, encoding)
+            out = self._limited_read(stdout, buffer_size, encoding)
             if out:
                 sys.stdout.write(out)
 
             if p.poll() != None:
-                out = p.stdout.read()
+                out = stdout.read()
                 sys.stdout.write(out)
                 break
 
