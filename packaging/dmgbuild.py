@@ -12,13 +12,16 @@ settings_file = "Full Disk Access Settings.url"
 fuji_app_file = "Fuji.app"
 license_file = "LICENSE.rtf"
 physical_media_file = ".IAPhysicalMedia"
+start_file = "start.sh"
 
 files = [
     str(pack_directory / settings_file),
     str(dist_directory / fuji_app_file),
     str(pack_directory / license_file),
     str(recovery_directory / physical_media_file),
+    str(recovery_directory / start_file),
 ]
+hide = [start_file]
 icon_locations = {
     settings_file: (128, 128),
     fuji_app_file: (320, 128),
