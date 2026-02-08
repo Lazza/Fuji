@@ -13,18 +13,18 @@ class AsrMethod(AcquisitionMethod):
         report.path_details = self._gather_path_info(params.source)
         report.hardware_info = self._gather_hardware_info()
 
-        success = self._create_temporary_image(report)
-        if not success:
+        temporary_bundle = self._create_temporary_image(report)
+        if not temporary_bundle:
             return report
 
-        print("\nASR", params.source, "->", self.temporary_volume)
+        print("\nASR", params.source, "->", temporary_bundle.volume)
         command = [
             "asr",
             "restore",
             "--source",
             f"{params.source}",
             "--target",
-            self.temporary_volume,
+            temporary_bundle.volume,
             "--noprompt",
             "--erase",
         ]

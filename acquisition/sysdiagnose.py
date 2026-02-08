@@ -3,6 +3,7 @@ import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import IO
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
 
@@ -117,18 +118,19 @@ class SysdiagnoseMethod(AcquisitionMethod):
             f"{logarchive_path}",
         ]
         p = self._create_shell_process(command)
+        stdout: IO[str] = p.stdout # type: ignore
 
         while True:
             time.sleep(0.1)
 
-            lines = p.stdout.readlines(buffer_size)
+            lines = stdout.readlines(buffer_size)
             for line in lines:
                 self._write_log_line(line, cursor)
             print(".", end="")
             connection.commit()
 
             if p.poll() != None:
-                lines = p.stdout.readlines()
+                lines = stdout.readlines()
                 for line in lines:
                     self._write_log_line(line, cursor)
                 print(".", end="")
@@ -160,11 +162,11 @@ class SysdiagnoseMethod(AcquisitionMethod):
         # Write preliminary report
         self._write_report(report)
 
-        success = self._create_temporary_image(report)
-        if not success:
+        temporary_bundle = self._create_temporary_image(report)
+        if not temporary_bundle:
             return report
 
-        sysdiagnose_destination = Path(self.temporary_mount)
+        sysdiagnose_destination = Path(temporary_bundle.mount)
         folder_name = "sysdiagnose_fuji"
         mount_point = self._find_mount_point(params.source)
 

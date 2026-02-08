@@ -11,11 +11,11 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from subprocess import Popen
-from typing import IO, List, Tuple
+from typing import IO, List, Optional, Tuple
 
 from meta import AUTHOR, VERSION
 from shared.environment import RECOVERY, SOURCE_PATH
-from shared.utils import command_to_properties, lines_to_properties
+from shared.utils import lines_to_properties
 
 
 @dataclass
@@ -54,24 +54,33 @@ class HashedFile:
 class Report:
     parameters: Parameters
     method: "AcquisitionMethod"
-    start_time: datetime = None
-    end_time: datetime = None
-    path_details: PathDetails = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    path_details: PathDetails = None # type: ignore
     hardware_info: str = ""
     success: bool = False
     output_files: List[Path] = field(default_factory=list)
-    result: HashedFile = None
+    result: HashedFile = None # type: ignore
+
+
+@dataclass
+class SparseBundleInfo:
+    path: Path
+    container: str
+    volume: str
+    mount: str
 
 
 class AcquisitionMethod(ABC):
     name = "Abstract method"
     description = "This method cannot be used directly"
 
-    temporary_path: Path = None
-    temporary_container: str = None
-    temporary_volume: str = None
-    temporary_mount: str = None
-    output_path: Path = None
+    temporary_bundle: Optional[SparseBundleInfo] = None
+    output_path: Path
+
+    def available(self) -> bool:
+        """Returns whether the acquisition method is available."""
+        return True
 
     def _limited_read(self, file: IO[str], limit: int, encoding: str) -> str:
         sel = selectors.DefaultSelector()
@@ -236,9 +245,11 @@ class AcquisitionMethod(ABC):
         )
         return hardware_info
 
-    def _create_temporary_image(self, report: Report) -> bool:
+    def _create_sparse_bundle(
+        self, report: Report, base: Path, suffix: str = ""
+    ) -> Optional[SparseBundleInfo]:
         params = report.parameters
-        output_directory = params.tmp / params.image_name
+        output_directory = base / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
 
         best_filesystem = "HFS+"
@@ -248,11 +259,9 @@ class AcquisitionMethod(ABC):
         # Add a bit of extra space to ensure the destination is large enough
         extra_gigabyte_sectors = 2 * 10**6
         sectors = report.path_details.disk_sectors + extra_gigabyte_sectors
-        self.temporary_path = output_directory / f"{params.image_name}.sparseimage"
+        temporary_path = output_directory / f"{params.image_name}{suffix}.sparseimage"
 
-        image_path: str = f"{self.temporary_path}"
-        self.temporary_container = None
-        self.temporary_volume = None
+        image_path: str = f"{temporary_path}"
         result, output = self._run_process(
             [
                 "hdiutil",
@@ -267,7 +276,7 @@ class AcquisitionMethod(ABC):
             ],
         )
         if result > 0:
-            return False
+            return None
 
         result, output = self._run_process(["hdiutil", "attach", image_path])
         output_lines = output.strip().splitlines()
@@ -280,38 +289,61 @@ class AcquisitionMethod(ABC):
         success = result == 0 and len(volume_lines) > 0
         if success:
             container_line = container_lines[0]
-            parts = re.split("\s+", container_line, maxsplit=2)
-            self.temporary_container = parts[0]
+            parts = re.split(r"\s+", container_line, maxsplit=2)
+            temporary_container = parts[0]
 
             mount_line = volume_lines[0]
-            parts = re.split("\s+", mount_line, maxsplit=2)
-            self.temporary_volume = parts[0]
-            self.temporary_mount = parts[2]
+            parts = re.split(r"\s+", mount_line, maxsplit=2)
+            temporary_volume = parts[0]
+            temporary_mount = parts[2]
 
-            report.output_files.append(self.temporary_path)
+            report.output_files.append(temporary_path)
             # Write preliminary report
             self._write_report(report)
 
-        return success
+            bundle_info = SparseBundleInfo(
+                path=temporary_path,
+                container=temporary_container,
+                volume=temporary_volume,
+                mount=temporary_mount,
+            )
+            return bundle_info
 
-    def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
-        print("\nWaiting to detach temporary image...")
+        return None
+
+    def _create_temporary_image(self, report: Report) -> Optional[SparseBundleInfo]:
+        base = report.parameters.tmp
+        info = self._create_sparse_bundle(report, base=base, suffix="-temporary")
+        self.temporary_bundle = info
+        return info
+
+    def _detach_sparse_bundle(
+        self, bundle: SparseBundleInfo, delay=10, interval=5, attempts=20
+    ) -> bool:
+        print(f"\nWaiting to detach {bundle.volume}...")
         time.sleep(delay)
 
         i = 1
         while True:
-            result = self._run_status(["hdiutil", "detach", self.temporary_volume])
+            result = self._run_status(["hdiutil", "detach", bundle.volume])
             if result == 0:
                 break
             i = i + 1
             if i == attempts:
-                print("Failed to detach temporary image!")
+                print("Failed to detach image!")
                 return False
             time.sleep(interval)
 
         # This could be automatically unmounted, we don't check for success
-        _ = self._run_status(["hdiutil", "detach", self.temporary_container])
+        _ = self._run_status(["hdiutil", "detach", bundle.container])
         return True
+
+    def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
+        if not self.temporary_bundle:
+            return False
+        return self._detach_sparse_bundle(
+            self.temporary_bundle, delay, interval, attempts
+        )
 
     def _generate_dmg(self, report: Report) -> bool:
         params = report.parameters
@@ -319,8 +351,10 @@ class AcquisitionMethod(ABC):
         output_directory.mkdir(parents=True, exist_ok=True)
         self.output_path = output_directory / f"{params.image_name}.dmg"
 
-        print("\nConverting", self.temporary_path, "->", self.output_path)
-        sparseimage = f"{self.temporary_path}"
+        if not self.temporary_bundle:
+            return False
+        print("\nConverting", self.temporary_bundle.path, "->", self.output_path)
+        sparseimage = f"{self.temporary_bundle.path}"
         dmg = f"{self.output_path}"
         result = self._run_status(
             ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
@@ -390,7 +424,7 @@ class AcquisitionMethod(ABC):
         if len(report.output_files):
             output_files = [
                 separator,
-                "Generated files:",
+                "Generated artifacts (including temporary ones):",
             ] + [f"    - {file}" for file in report.output_files]
 
         hashes = []
