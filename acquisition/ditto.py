@@ -14,15 +14,15 @@ class DittoMethod(AcquisitionMethod):
         report.path_details = self._gather_path_info(params.source)
         report.hardware_info = self._gather_hardware_info()
 
-        temporary_bundle = self._create_temporary_image(report)
-        if not temporary_bundle:
+        temporary_image = self._create_temporary_image(report)
+        if not temporary_image:
             return report
 
-        print("\nDitto", params.source, "->", temporary_bundle.mount)
+        print("\nDitto", params.source, "->", temporary_image.mount)
         source_str = f"{params.source}"
         if not source_str.endswith("/"):
             source_str = source_str + "/"
-        command = ["ditto", "-X", "-V", source_str, temporary_bundle.mount]
+        command = ["ditto", "-X", "-V", source_str, temporary_image.mount]
         status = self._run_status(command)
 
         # We cannot rely on the exit code, because it will probably contain some

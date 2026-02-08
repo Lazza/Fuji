@@ -48,18 +48,18 @@ class RsyncMethod(AcquisitionMethod):
         print("Computing exclusions...")
         exclusions = self._compute_exclusions(params)
 
-        temporary_bundle = self._create_temporary_image(report)
-        if not temporary_bundle:
+        temporary_image = self._create_temporary_image(report)
+        if not temporary_image:
             return report
 
-        print("\nRsync", params.source, "->", temporary_bundle.mount)
+        print("\nRsync", params.source, "->", temporary_image.mount)
         source_str = f"{params.source}"
         if not source_str.endswith("/"):
             source_str = source_str + "/"
         command = [RSYNC_PATH, "-xrlptgoEv", "--progress"]
         for exclusion in exclusions:
             command.extend(["--exclude", f"{exclusion}/"])
-        command.extend([source_str, temporary_bundle.mount])
+        command.extend([source_str, temporary_image.mount])
         status = self._run_status(command)
 
         # We cannot rely on the exit code, because it will probably contain some

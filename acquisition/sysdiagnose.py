@@ -166,11 +166,11 @@ class SysdiagnoseMethod(AcquisitionMethod):
         # Write preliminary report
         self._write_report(report)
 
-        temporary_bundle = self._create_temporary_image(report)
-        if not temporary_bundle:
+        temporary_image = self._create_temporary_image(report)
+        if not temporary_image:
             return report
 
-        sysdiagnose_destination = Path(temporary_bundle.mount)
+        sysdiagnose_destination = Path(temporary_image.mount)
         folder_name = "sysdiagnose_fuji"
         mount_point = self._find_mount_point(params.source)
 
