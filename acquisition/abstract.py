@@ -346,6 +346,15 @@ class AcquisitionMethod(ABC):
         self._run_silent(["hdiutil", "detach", "-force", image.container])
         return True
 
+    def _start_coffee(self) -> Popen:
+        # Some processes need to be caffeinated manually, for long computations
+        # done directly via our Python code. We start a caffeinate instance with
+        # a very long duration (7 days) and kill it after the process is over.
+
+        one_week = 60 * 60 * 24 * 7
+        coffee: Popen = subprocess.Popen(["caffeinate", "-dimsu", "-t", f"{one_week}"])
+        return coffee
+
     def _generate_dmg(self, report: Report) -> bool:
         params = report.parameters
         output_directory = params.destination / params.image_name
@@ -377,6 +386,7 @@ class AcquisitionMethod(ABC):
 
         # Copy file to final destination
         print("\nMoving", temporary_output_path, "->", self.output_path)
+        coffee = self._start_coffee()
         try:
             move(temporary_output_path, self.output_path)
             report.output_files.append(self.output_path)
@@ -385,6 +395,8 @@ class AcquisitionMethod(ABC):
             print("Error while moving DMG to final destination!")
             print(f"{e}")
             success = False
+        finally:
+            coffee.kill()
 
         detach_result = self._detach_sparse_image(conversion_image)
         # Try to remove the conversion image directory, if empty
@@ -408,13 +420,7 @@ class AcquisitionMethod(ABC):
         sha256 = hashlib.sha256()
         md5 = hashlib.md5()
 
-        # The process needs to be caffeinated manually, because the hashing
-        # function is done directly via our Python code. We start a caffeinate
-        # instance with a very long duration (7 days) and terminate after the
-        # process is completed.
-
-        one_week = 60 * 60 * 24 * 7
-        coffee = subprocess.Popen(["caffeinate", "-dimsu", "-t", f"{one_week}"])
+        coffee = self._start_coffee()
 
         try:
             with open(path, "rb") as f:
