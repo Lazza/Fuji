@@ -86,7 +86,7 @@ class AcquisitionMethod(ABC):
             return ""
 
     def _create_shell_process(
-        self, arguments: List[str], awake=True, tee: Path = None
+        self, arguments: List[str], awake=True, tee: Optional[Path] = None
     ) -> Popen[str]:
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
@@ -113,13 +113,17 @@ class AcquisitionMethod(ABC):
         return p.returncode, p.stdout
 
     def _run_process(
-        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+        self,
+        arguments: List[str],
+        awake=True,
+        buffer_size=1024000,
+        tee: Optional[Path] = None,
     ) -> Tuple[int, str]:
         # Run a process in plain sight. Return its status code and output.
         p = self._create_shell_process(arguments, awake=awake, tee=tee)
 
-        stdout: IO[str] = p.stdout # type: ignore
-        encoding: str = stdout.encoding # type: ignore
+        stdout: IO[str] = p.stdout  # type: ignore
+        encoding: str = stdout.encoding  # type: ignore
         output = ""
         while True:
             # Let it breathe and avoid the UI getting stuck
@@ -138,13 +142,17 @@ class AcquisitionMethod(ABC):
         return p.returncode, output
 
     def _run_status(
-        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+        self,
+        arguments: List[str],
+        awake=True,
+        buffer_size=1024000,
+        tee: Optional[Path] = None,
     ) -> int:
         # Run a process in plain sight. Return its status code.
         p = self._create_shell_process(arguments, awake=awake, tee=tee)
 
-        stdout: IO[str] = p.stdout # type: ignore
-        encoding: str = stdout.encoding # type: ignore
+        stdout: IO[str] = p.stdout  # type: ignore
+        encoding: str = stdout.encoding  # type: ignore
         while True:
             # Let it breathe and avoid the UI getting stuck
             time.sleep(0.1)
