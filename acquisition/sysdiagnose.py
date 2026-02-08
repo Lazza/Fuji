@@ -170,7 +170,7 @@ class SysdiagnoseMethod(AcquisitionMethod):
         folder_name = "sysdiagnose_fuji"
         mount_point = self._find_mount_point(params.source)
 
-        print("\nRunning sysdiagnose -> ", sysdiagnose_destination)
+        print("\nRunning sysdiagnose ->", sysdiagnose_destination)
         command = [
             "sysdiagnose",
             "-f",
@@ -192,7 +192,7 @@ class SysdiagnoseMethod(AcquisitionMethod):
         logarchive_path = folder_path / "system_logs.logarchive"
         database_file = sysdiagnose_destination / "system_logs.db"
 
-        print("\nRunning log show -> ", logarchive_path)
+        print("\nRunning log show ->", logarchive_path)
         status = self._convert_logs(logarchive_path, database_file)
 
         if not status == 0:
