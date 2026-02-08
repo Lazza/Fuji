@@ -14,6 +14,7 @@ import wx.lib.agw.hyperlink as hl
 
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
+from acquisition.ditto import DittoMethod
 from acquisition.rsync import RsyncMethod
 from acquisition.sysdiagnose import SysdiagnoseMethod
 from checks.name import NameCheck
@@ -33,6 +34,7 @@ from shared.utils import (
 
 ALL_METHODS: List[AcquisitionMethod] = [
     AsrMethod(),
+    DittoMethod(),
     RsyncMethod(),
     SysdiagnoseMethod(),
 ]
