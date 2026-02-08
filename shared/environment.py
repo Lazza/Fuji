@@ -1,7 +1,12 @@
 import os
+import shlex
+import subprocess
+import sys
+from pathlib import Path
+
+from meta import RAMDISK_NAME, VOLUME_NAME
 
 from .utils import command_to_properties
-
 
 RECOVERY: bool = bool(os.getenv("__OSINSTALL_ENVIRONMENT", ""))
 OS_ROOT: str = "/"
@@ -23,3 +28,99 @@ RSYNC_PATH: str = os.path.join(OS_ROOT, "usr/bin/rsync")
 SLURP_PATH: str = os.path.join(
     OS_ROOT, "System/Library/Filesystems/apfs.fs/Contents/Resources/slurpAPFSMeta"
 )
+
+
+def current_volume() -> str:
+    if getattr(sys, "frozen", False):
+        # If the application is run as a bundle, the PyInstaller bootloader
+        # extends the sys module by a flag frozen=True and sets the app
+        # path into variable _MEIPASS'.
+        application_path = Path(sys._MEIPASS)  # type: ignore
+    else:
+        application_path = Path(__file__).absolute().parent
+
+    print(application_path)
+    components = application_path.parts
+    if components[1] != "Volumes":
+        return ""
+    return components[2]
+
+
+def attempt_ramdisk() -> None:
+    volume = current_volume()
+    if volume.startswith(RAMDISK_NAME):
+        return
+
+    # Exit if the volume is not recognized
+    if not volume.startswith(VOLUME_NAME):
+        return
+
+    print("Attempting to create and switch to RAM disk...")
+    # Clone the contents of the volume to a RAM disk (256 MB)
+    sectors = 256 * 1024 * 1024 // 512
+    try:
+        attach_result = subprocess.run(
+            ["hdiutil", "attach", "-nomount", f"ram://{sectors}"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        ramdisk_device = attach_result.stdout.strip()
+
+        # Format the RAM disk
+        subprocess.run(
+            ["diskutil", "erasevolume", "HFS+", RAMDISK_NAME, ramdisk_device],
+            check=True,
+        )
+
+        # Find the mount point of the RAM disk
+        mount_lines = command_to_properties(["mount"], separator=" on ")
+        ramdisk = None
+        for mount_path, description in mount_lines.items():
+            if RAMDISK_NAME in description and ramdisk_device in mount_path:
+                ramdisk = Path(description.split("(")[0].strip())
+                break
+
+        if not ramdisk:
+            print("Error: RAM disk mount point not found.")
+            return  # Abort the RAM disk attempt
+
+        source_fujiapp = Path("/Volumes") / volume
+
+        # Copy contents
+        print(f"Copying from {source_fujiapp} to {ramdisk}...")
+        subprocess.run(["ditto", source_fujiapp, ramdisk], check=True)
+
+        # Determine the new executable path
+        ramdisk_executable = ramdisk / "Fuji.app" / "Contents" / "MacOS" / "Fuji"
+
+        # Detach the original volume and create symlink in a detached shell process after a delay
+        quoted_source_fujiapp = shlex.quote(source_fujiapp.as_posix())
+        quoted_ramdisk = shlex.quote(ramdisk.as_posix())
+
+        shell_command = (
+            f"sleep 2 && "  # Delay for 2 seconds
+            f"hdiutil detach -force {quoted_source_fujiapp} && "  # Detach
+            f"ln -s {quoted_ramdisk} {quoted_source_fujiapp}"  # Create symlink
+        )
+
+        subprocess.Popen(
+            shell_command,
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+        # Start the new process from the RAM disk in a new session
+        subprocess.Popen(
+            ramdisk_executable,
+            start_new_session=True,
+        )
+
+        # Exit the current process cleanly
+        print("Switch to RAM disk successful. Exiting old process.")
+        sys.exit(0)
+
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("Aborting RAM disk attempt. Running from original location.")

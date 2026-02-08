@@ -21,7 +21,7 @@ from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
-from shared.environment import RECOVERY
+from shared.environment import RECOVERY, attempt_ramdisk
 from shared.utils import command_to_properties, dedent, lines_to_properties
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
@@ -711,6 +711,10 @@ class ProcessingWindow(wx.Frame):
 
 
 if __name__ == "__main__":
+    if RECOVERY:
+        # Attempt to migrate to a RAM disk
+        attempt_ramdisk()
+
     # Try to find the serial number
     information = command_to_properties(
         ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],

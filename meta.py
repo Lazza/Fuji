@@ -1,3 +1,5 @@
 VERSION = "1.1.0"
 AUTHOR = "Andrea Lazzarotto"
 HOMEPAGE = "https://andrealazzarotto.com"
+VOLUME_NAME = "FujiApp"
+RAMDISK_NAME = "FujiRAMDisk"

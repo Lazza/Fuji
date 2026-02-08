@@ -73,7 +73,7 @@ copy("./packaging/Fuji.sh", executable_path / "Fuji")
 
 dmg_path = f"./dist/FujiApp-{meta.VERSION}.dmg"
 temp_dmg_path = f"./dist/FujiApp-{meta.VERSION}-temp.dmg"
-volume_name = "FujiApp"
+volume_name = meta.VOLUME_NAME
 
 print("Building temporary DMG", temp_dmg_path)
 try:
