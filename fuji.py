@@ -513,6 +513,7 @@ class InputWindow(wx.Frame):
             app = wx.GetApp()
             app.ExitMainLoop()
 
+
 class OverviewWindow(wx.Frame):
     def __init__(self):
         super().__init__(
