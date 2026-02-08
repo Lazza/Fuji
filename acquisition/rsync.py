@@ -3,13 +3,16 @@ from pathlib import Path
 from typing import List
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
-from shared.environment import RSYNC_PATH
+from shared.environment import RECOVERY, RSYNC_PATH
 
 
 class RsyncMethod(AcquisitionMethod):
     name = "Rsync"
     description = """Files and directories are copied using Rsync.
     This is slower but it can be used on any source directory. Errors are ignored."""
+
+    def available(self) -> bool:
+        return not RECOVERY
 
     def _compute_exclusions(self, params: Parameters) -> List[Path]:
         # Rsync can be tricked into acquiring files multiple times by macOS, due

@@ -6,12 +6,16 @@ from pathlib import Path
 from typing import IO
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
+from shared.environment import RECOVERY
 
 
 class SysdiagnoseMethod(AcquisitionMethod):
     name = "Sysdiagnose"
     description = """System logs and configuration.
     This only acquires system data and unified logs (converted to SQLite)."""
+
+    def available(self) -> bool:
+        return not RECOVERY
 
     def _write_log_line(self, line: str, cursor: sqlite3.Cursor) -> None:
         data = json.loads(line)
@@ -118,7 +122,7 @@ class SysdiagnoseMethod(AcquisitionMethod):
             f"{logarchive_path}",
         ]
         p = self._create_shell_process(command)
-        stdout: IO[str] = p.stdout # type: ignore
+        stdout: IO[str] = p.stdout  # type: ignore
 
         while True:
             time.sleep(0.1)

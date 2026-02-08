@@ -31,7 +31,12 @@ from shared.utils import (
     lines_to_properties,
 )
 
-METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
+ALL_METHODS: List[AcquisitionMethod] = [
+    AsrMethod(),
+    RsyncMethod(),
+    SysdiagnoseMethod(),
+]
+METHODS = [m for m in ALL_METHODS if m.available()]
 CHECKS = [NameCheck(), FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
 PARAMS = Parameters()
 

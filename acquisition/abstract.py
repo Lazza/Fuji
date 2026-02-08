@@ -56,11 +56,11 @@ class Report:
     method: "AcquisitionMethod"
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
-    path_details: PathDetails = None # type: ignore
+    path_details: PathDetails = None  # type: ignore
     hardware_info: str = ""
     success: bool = False
     output_files: List[Path] = field(default_factory=list)
-    result: HashedFile = None # type: ignore
+    result: HashedFile = None  # type: ignore
 
 
 @dataclass
