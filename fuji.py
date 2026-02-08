@@ -10,7 +10,6 @@ from typing import Iterable, List, Optional
 
 import humanize
 import wx
-import wx.lib.agw.hyperlink as hl
 
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
@@ -22,7 +21,7 @@ from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
-from shared.environment import RECOVERY, attempt_ramdisk
+from shared.environment import RECOVERY, AdaptiveHyperLinkCtrl, attempt_ramdisk
 from shared.utils import (
     ACCENT_COLOR,
     GREEN_COLOR,
@@ -323,7 +322,7 @@ class InputWindow(wx.Frame):
         desc.SetFont(desc_font)
 
         byline_text = wx.StaticText(panel, label=f"Version {VERSION} by {AUTHOR}")
-        byline_link = hl.HyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
+        byline_link = AdaptiveHyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
         accent = wx.Colour(*ACCENT_COLOR)
         byline_link.SetColours(accent, accent, accent)
         byline_link.SetBold(True)

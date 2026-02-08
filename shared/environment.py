@@ -3,6 +3,7 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+import wx.lib.agw.hyperlink as hl
 
 from meta import RAMDISK_NAME, VOLUME_NAME
 
@@ -124,3 +125,38 @@ def attempt_ramdisk() -> None:
 
     except (subprocess.CalledProcessError, FileNotFoundError):
         print("Aborting RAM disk attempt. Running from original location.")
+
+
+class AdaptiveHyperLinkCtrl(hl.HyperLinkCtrl):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.safari = Path(
+            "/System/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari"
+        )
+        self.override = RECOVERY and self.safari.exists()
+        self.data_path = Path(
+            "/System/Volumes/Data/private/var/root/Library/Containers/com.apple.Safari/Data/"
+        )
+        self.html_name = "redirect.html"
+        self.html_path = self.data_path / self.html_name
+
+    def GotoURL(self, URL, ReportErrors=True, NotSameWinIfPossible=False):
+        if not self.override:
+            return super().GotoURL(URL, ReportErrors, NotSameWinIfPossible)
+
+        # Leverage Safari's ability to open local HTML files to perform the
+        # redirection, since we cannot pass a custom URL directly to it.
+        html_content = f"""<!DOCTYPE html>
+        <html>
+        <head>
+            <script>location.href = "{URL}";</script>
+            <title>Redirect...</title>
+        </head>
+        <body>
+        </body>
+        </html>"""
+        self.data_path.mkdir(parents=True, exist_ok=True)
+        self.html_path.write_text(html_content)
+
+        subprocess.Popen([self.safari, self.html_name])
+        return True
