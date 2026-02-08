@@ -1,5 +1,9 @@
 import subprocess
-from typing import List, Tuple
+from typing import List
+
+ACCENT_COLOR = (181, 78, 78)
+GREEN_COLOR = (34, 170, 54)
+RED_COLOR = (203, 11, 1)
 
 
 def lines_to_properties(lines: List[str], separator=":", strip_chars=None) -> dict:

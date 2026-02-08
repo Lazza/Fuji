@@ -22,7 +22,14 @@ from checks.free_space import FreeSpaceCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 from shared.environment import RECOVERY, attempt_ramdisk
-from shared.utils import command_to_properties, dedent, lines_to_properties
+from shared.utils import (
+    ACCENT_COLOR,
+    GREEN_COLOR,
+    RED_COLOR,
+    command_to_properties,
+    dedent,
+    lines_to_properties,
+)
 
 METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
 CHECKS = [NameCheck(), FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
@@ -310,7 +317,7 @@ class InputWindow(wx.Frame):
 
         byline_text = wx.StaticText(panel, label=f"Version {VERSION} by {AUTHOR}")
         byline_link = hl.HyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
-        accent = wx.Colour(181, 78, 78)
+        accent = wx.Colour(*ACCENT_COLOR)
         byline_link.SetColours(accent, accent, accent)
         byline_link.SetBold(True)
         byline_link.UpdateLink()
@@ -578,7 +585,9 @@ class OverviewWindow(wx.Frame):
             label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
             label_text.SetFont(label_text_font)
             if not result.passed:
-                label_text.SetForegroundColour((240, 20, 20))
+                label_text.SetForegroundColour(RED_COLOR)
+            else:
+                label_text.SetForegroundColour(GREEN_COLOR)
             value_text = wx.StaticText(
                 self.panel,
                 label=result.message,
@@ -697,10 +706,10 @@ class ProcessingWindow(wx.Frame):
     def set_completion_status(self, success):
         if success:
             self.title.SetLabel("Acquisition completed")
-            self.title.SetForegroundColour((20, 240, 20))
+            self.title.SetForegroundColour(GREEN_COLOR)
         else:
             self.title.SetLabel("Acquisition failed")
-            self.title.SetForegroundColour((240, 20, 20))
+            self.title.SetForegroundColour(RED_COLOR)
         self.title.SetFont(self.title_font)
         self.running = False
 
