@@ -436,8 +436,10 @@ class InputWindow(wx.Frame):
         self.SetSizerAndFit(sizer)
         self.Center()
 
-        # Bind close
-        self.Bind(wx.EVT_CLOSE, self.on_close)
+        # Bind close and create a menu bar
+        menu_bar = wx.MenuBar()
+        self.SetMenuBar(menu_bar)
+        self.Bind(wx.EVT_CLOSE, self.on_quit)
 
     def on_open_devices(self, event):
         if self.devices_window is not None:
@@ -500,10 +502,16 @@ class InputWindow(wx.Frame):
         OVERVIEW_WINDOW.update_overview()
         OVERVIEW_WINDOW.Show()
 
-    def on_close(self, event):
-        app: wx.App = wx.GetApp()
-        app.ExitMainLoop()
-
+    def on_quit(self, event):
+        if PROCESSING_WINDOW.running:
+            wx.MessageBox(
+                "Cannot quit while an acquisition is in progress.",
+                "Acquisition in progress",
+                wx.OK | wx.ICON_INFORMATION,
+            )
+        else:
+            app = wx.GetApp()
+            app.ExitMainLoop()
 
 class OverviewWindow(wx.Frame):
     def __init__(self):
@@ -624,6 +632,8 @@ class OverviewWindow(wx.Frame):
 
 
 class ProcessingWindow(wx.Frame):
+    running = False
+
     def __init__(self):
         super().__init__(
             parent=None,
