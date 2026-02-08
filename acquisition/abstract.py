@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from shutil import move
 from subprocess import Popen
 from typing import IO, List, Optional, Tuple
 
@@ -64,7 +65,7 @@ class Report:
 
 
 @dataclass
-class SparseBundleInfo:
+class SparseInfo:
     path: Path
     container: str
     volume: str
@@ -75,7 +76,7 @@ class AcquisitionMethod(ABC):
     name = "Abstract method"
     description = "This method cannot be used directly"
 
-    temporary_bundle: Optional[SparseBundleInfo] = None
+    temporary_image: Optional[SparseInfo] = None
     output_path: Path
 
     def available(self) -> bool:
@@ -245,9 +246,9 @@ class AcquisitionMethod(ABC):
         )
         return hardware_info
 
-    def _create_sparse_bundle(
+    def _create_sparse_image(
         self, report: Report, base: Path, suffix: str = ""
-    ) -> Optional[SparseBundleInfo]:
+    ) -> Optional[SparseInfo]:
         params = report.parameters
         output_directory = base / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
@@ -301,31 +302,38 @@ class AcquisitionMethod(ABC):
             # Write preliminary report
             self._write_report(report)
 
-            bundle_info = SparseBundleInfo(
+            image_info = SparseInfo(
                 path=temporary_path,
                 container=temporary_container,
                 volume=temporary_volume,
                 mount=temporary_mount,
             )
-            return bundle_info
+            return image_info
 
         return None
 
-    def _create_temporary_image(self, report: Report) -> Optional[SparseBundleInfo]:
-        base = report.parameters.tmp
-        info = self._create_sparse_bundle(report, base=base, suffix="-temporary")
-        self.temporary_bundle = info
+    def _create_temporary_image(self, report: Report) -> Optional[SparseInfo]:
+        # Temporary image is placed in the destination directory
+        base = report.parameters.destination
+        info = self._create_sparse_image(report, base=base, suffix="-temporary")
+        self.temporary_image = info
         return info
 
-    def _detach_sparse_bundle(
-        self, bundle: SparseBundleInfo, delay=10, interval=5, attempts=20
+    def _create_conversion_image(self, report: Report) -> Optional[SparseInfo]:
+        # Conversion image is placed in the temporary directory
+        base = report.parameters.tmp
+        info = self._create_sparse_image(report, base=base, suffix="-conversion")
+        return info
+
+    def _detach_sparse_image(
+        self, image: SparseInfo, delay=10, interval=5, attempts=20
     ) -> bool:
-        print(f"\nWaiting to detach {bundle.volume}...")
+        print(f"\nWaiting to detach {image.volume}...")
         time.sleep(delay)
 
         i = 1
         while True:
-            result = self._run_status(["hdiutil", "detach", bundle.volume])
+            result = self._run_status(["hdiutil", "detach", image.volume])
             if result == 0:
                 break
             i = i + 1
@@ -335,36 +343,58 @@ class AcquisitionMethod(ABC):
             time.sleep(interval)
 
         # This could be automatically unmounted, we don't check for success
-        _ = self._run_status(["hdiutil", "detach", bundle.container])
+        self._run_silent(["hdiutil", "detach", "-force", image.container])
         return True
-
-    def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
-        if not self.temporary_bundle:
-            return False
-        return self._detach_sparse_bundle(
-            self.temporary_bundle, delay, interval, attempts
-        )
 
     def _generate_dmg(self, report: Report) -> bool:
         params = report.parameters
         output_directory = params.destination / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
-        self.output_path = output_directory / f"{params.image_name}.dmg"
+        final_image_name = f"{params.image_name}.dmg"
+        self.output_path = output_directory / final_image_name
 
-        if not self.temporary_bundle:
+        if not self.temporary_image:
             return False
-        print("\nConverting", self.temporary_bundle.path, "->", self.output_path)
-        sparseimage = f"{self.temporary_bundle.path}"
-        dmg = f"{self.output_path}"
+
+        conversion_image = self._create_conversion_image(report)
+        if not conversion_image:
+            return False
+
+        temporary_output_path = Path(conversion_image.mount) / final_image_name
+        print("\nConverting", self.temporary_image.path, "->", temporary_output_path)
+        sparseimage = f"{self.temporary_image.path}"
+        dmg = f"{temporary_output_path}"
         result = self._run_status(
             ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
         )
-
         success = result == 0
-        if success:
-            report.output_files.append(self.output_path)
 
-        return success
+        if not success:
+            return False
+
+        # Remove the temporary image and free up space for the DMG
+        self.temporary_image.path.unlink(missing_ok=True)
+
+        # Copy file to final destination
+        print("\nMoving", temporary_output_path, "->", self.output_path)
+        try:
+            move(temporary_output_path, self.output_path)
+            report.output_files.append(self.output_path)
+            success = True
+        except Exception as e:
+            print("Error while moving DMG to final destination!")
+            print(f"{e}")
+            success = False
+
+        detach_result = self._detach_sparse_image(conversion_image)
+        # Try to remove the conversion image directory, if empty
+        conversion_image.path.unlink(missing_ok=True)
+        try:
+            conversion_image.path.parent.rmdir()
+        except Exception:
+            pass
+
+        return success and detach_result
 
     def _compute_hashes(self, path: Path) -> HashedFile:
         print("\nHashing", path)
@@ -465,7 +495,10 @@ class AcquisitionMethod(ABC):
                 output.write(line + "\n")
 
     def _dmg_and_hash(self, report: Report) -> Report:
-        result = self._detach_temporary_image()
+        if not self.temporary_image:
+            return report
+
+        result = self._detach_sparse_image(self.temporary_image)
         if not result:
             return report
 
