@@ -1,5 +1,6 @@
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -132,20 +133,18 @@ class AdaptiveHyperLinkCtrl(hl.HyperLinkCtrl):
         super().__init__(*args, **kwargs)
 
         # Apple Silicon macOS recovery
-        self.safari = Path(
-            "/System/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari"
-        )
-        self.data_path = Path(
-            "/System/Volumes/Data/private/var/root/Library/Containers/com.apple.Safari/Data/"
-        )
+        safari_app = Path("/System/Cryptexes/App/System/Applications/Safari.app")
+        containers = Path("/System/Volumes/Data/private/var/root/Library/Containers/")
 
         # Intel-based macOS recovery
-        if not self.safari.exists():
-            self.safari = Path("/Applications/Safari.app/Contents/MacOS/Safari")
-            self.data_path = Path(
-                "/private/var/root/Library/Containers/com.apple.Safari/Data/"
-            )
+        if not safari_app.exists():
+            safari_app = Path("/Applications/Safari.app")
+            containers = Path("/private/var/root/Library/Containers/")
 
+        self.data_path = containers / "com.apple.Safari" / "Data"
+        self.safari = safari_app / "Contents" / "MacOS" / "Safari"
+
+        self.caches_path = self.data_path / "Library" / "Caches"
         self.html_name = "redirect.html"
         self.html_path = self.data_path / self.html_name
         self.override = RECOVERY and self.safari.exists()
@@ -153,6 +152,9 @@ class AdaptiveHyperLinkCtrl(hl.HyperLinkCtrl):
     def GotoURL(self, URL, ReportErrors=True, NotSameWinIfPossible=False):
         if not self.override:
             return super().GotoURL(URL, ReportErrors, NotSameWinIfPossible)
+
+        # Space can be very limited, clean temporary cache to be safe
+        shutil.rmtree(self.caches_path, ignore_errors=True)
 
         # Leverage Safari's ability to open local HTML files to perform the
         # redirection, since we cannot pass a custom URL directly to it.
