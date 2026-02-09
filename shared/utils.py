@@ -1,5 +1,6 @@
 import subprocess
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
 ACCENT_COLOR = (181, 78, 78)
 GREEN_COLOR = (34, 170, 54)
@@ -28,3 +29,16 @@ def dedent(text: str) -> str:
     if not lines:
         return text
     return "\n".join(line.strip() for line in lines)
+
+
+def datetime_string(value: Optional[datetime]) -> str:
+    if value is None:
+        return "-"
+    else:
+        info = value.astimezone().tzinfo
+        if info is not None:
+            timezone_name = f" ({info.tzname(value)})"
+        else:
+            timezone_name = ""
+        iso_format = value.isoformat(sep=" ")
+        return f"{iso_format}{timezone_name}"

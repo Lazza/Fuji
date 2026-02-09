@@ -16,7 +16,7 @@ from typing import IO, List, Optional, Tuple
 
 from meta import AUTHOR, VERSION
 from shared.environment import RECOVERY, SOURCE_PATH
-from shared.utils import lines_to_properties
+from shared.utils import datetime_string, lines_to_properties
 
 
 @dataclass
@@ -484,8 +484,8 @@ class AcquisitionMethod(ABC):
                     f"Examiner: {report.parameters.examiner}",
                     f"Notes: {report.parameters.notes}",
                     separator,
-                    f"Start time: {report.start_time}",
-                    f"End time: {report.end_time}",
+                    f"Start time: {datetime_string(report.start_time)}",
+                    f"End time: {datetime_string(report.end_time)}",
                     f"Source: {report.parameters.source}",
                     f"Acquisition method: {report.method.name}",
                     separator,
