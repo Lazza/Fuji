@@ -130,15 +130,25 @@ def attempt_ramdisk() -> None:
 class AdaptiveHyperLinkCtrl(hl.HyperLinkCtrl):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Apple Silicon macOS recovery
         self.safari = Path(
             "/System/Cryptexes/App/System/Applications/Safari.app/Contents/MacOS/Safari"
         )
-        self.override = RECOVERY and self.safari.exists()
         self.data_path = Path(
             "/System/Volumes/Data/private/var/root/Library/Containers/com.apple.Safari/Data/"
         )
+
+        # Intel-based macOS recovery
+        if not self.safari.exists():
+            self.safari = Path("/Applications/Safari.app/Contents/MacOS/Safari")
+            self.data_path = Path(
+                "/private/var/root/Library/Containers/com.apple.Safari/Data/"
+            )
+
         self.html_name = "redirect.html"
         self.html_path = self.data_path / self.html_name
+        self.override = RECOVERY and self.safari.exists()
 
     def GotoURL(self, URL, ReportErrors=True, NotSameWinIfPossible=False):
         if not self.override:
