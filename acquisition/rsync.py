@@ -9,7 +9,7 @@ from shared.environment import RECOVERY, RSYNC_PATH
 class RsyncMethod(AcquisitionMethod):
     name = "Rsync"
     description = """Files and directories are copied using Rsync.
-    This is slower but it can be used on any source directory. Errors are ignored."""
+    This is a bit slow but it can be used on any source directory. Errors are ignored."""
 
     def available(self) -> bool:
         return not RECOVERY

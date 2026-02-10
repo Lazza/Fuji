@@ -5,7 +5,7 @@ from acquisition.abstract import AcquisitionMethod, Parameters, Report
 class AsrMethod(AcquisitionMethod):
     name = "ASR"
     description = """Apple Software Restore logical acquisition.
-    This is the recommended option, but it works only for volumes."""
+    This is quite fast but less reliable, and it works only for volumes."""
 
     def execute(self, params: Parameters) -> Report:
         # Prepare report

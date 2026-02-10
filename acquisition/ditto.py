@@ -1,12 +1,19 @@
 from datetime import datetime
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
+from shared.environment import RECOVERY
 
 
 class DittoMethod(AcquisitionMethod):
     name = "Ditto"
     description = """Files and directories are copied using Ditto.
     This is a bit slow but it can be used on any source directory. Errors are ignored."""
+
+    def available(self) -> bool:
+        # Ditto is available in the running OS but it is not reliable, while it
+        # performs very well in the recovery environment. So we enable it only
+        # while running in recovery.
+        return RECOVERY
 
     def execute(self, params: Parameters) -> Report:
         # Prepare report

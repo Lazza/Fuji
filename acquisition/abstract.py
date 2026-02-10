@@ -488,6 +488,7 @@ class AcquisitionMethod(ABC):
                     f"End time: {datetime_string(report.end_time)}",
                     f"Source: {report.parameters.source}",
                     f"Acquisition method: {report.method.name}",
+                    f"Running in recovery environment: {RECOVERY}",
                     separator,
                     report.hardware_info,
                     separator,

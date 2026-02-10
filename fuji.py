@@ -32,9 +32,9 @@ from shared.utils import (
 )
 
 ALL_METHODS: List[AcquisitionMethod] = [
-    AsrMethod(),
     DittoMethod(),
     RsyncMethod(),
+    AsrMethod(),
     SysdiagnoseMethod(),
 ]
 METHODS = [m for m in ALL_METHODS if m.available()]
