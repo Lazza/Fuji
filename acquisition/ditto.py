@@ -39,4 +39,4 @@ class DittoMethod(AcquisitionMethod):
         else:
             print("Ditto terminated")
 
-        return self._dmg_and_hash(report)
+        return self._pack_and_hash(report)

@@ -3,9 +3,15 @@ import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import IO
+from typing import IO, Optional
 
-from acquisition.abstract import AcquisitionMethod, Parameters, Report
+from acquisition.abstract import (
+    AcquisitionMethod,
+    OutputFormat,
+    Parameters,
+    Report,
+    SparseInfo,
+)
 from shared.environment import RECOVERY
 
 
@@ -16,6 +22,13 @@ class SysdiagnoseMethod(AcquisitionMethod):
 
     def available(self) -> bool:
         return not RECOVERY
+
+    def _create_temporary_image(self, report: Report) -> Optional[SparseInfo]:
+        # Temporary image is placed in the temporary directory
+        base = report.parameters.tmp
+        info = self._create_sparse_image(report, base=base, suffix="-temporary")
+        self.temporary_image = info
+        return info
 
     def _write_log_line(self, line: str, cursor: sqlite3.Cursor) -> None:
         data = json.loads(line)
@@ -196,10 +209,10 @@ class SysdiagnoseMethod(AcquisitionMethod):
         logarchive_path = folder_path / "system_logs.logarchive"
         database_file = sysdiagnose_destination / "system_logs.db"
 
-        print("\nRunning log show ->", logarchive_path)
+        print("\nRunning log show on", logarchive_path)
         status = self._convert_logs(logarchive_path, database_file)
 
         if not status == 0:
             return report
 
-        return self._dmg_and_hash(report)
+        return self._pack_and_hash(report, format=OutputFormat.ZIP)

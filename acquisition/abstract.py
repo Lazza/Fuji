@@ -1,3 +1,4 @@
+from enum import Enum
 import hashlib
 import os
 import re
@@ -10,7 +11,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from shutil import copy
+from shutil import copy, make_archive
 from subprocess import Popen
 from typing import IO, List, Optional, Tuple
 
@@ -70,6 +71,11 @@ class SparseInfo:
     container: str
     volume: str
     mount: str
+
+
+class OutputFormat(Enum):
+    DMG = 1
+    ZIP = 2
 
 
 class AcquisitionMethod(ABC):
@@ -356,14 +362,18 @@ class AcquisitionMethod(ABC):
         return coffee
 
     def _generate_dmg(self, report: Report) -> bool:
+        if not self.temporary_image:
+            return False
+
+        result = self._detach_sparse_image(self.temporary_image)
+        if not result:
+            return False
+
         params = report.parameters
         output_directory = params.destination / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
         final_image_name = f"{params.image_name}.dmg"
         self.output_path = output_directory / final_image_name
-
-        if not self.temporary_image:
-            return False
 
         conversion_image = self._create_conversion_image(report)
         if not conversion_image:
@@ -403,6 +413,43 @@ class AcquisitionMethod(ABC):
         conversion_image.path.unlink(missing_ok=True)
         try:
             conversion_image.path.parent.rmdir()
+        except Exception:
+            pass
+
+        return success and detach_result
+
+    def _generate_zip(self, report: Report) -> bool:
+        if not self.temporary_image:
+            return False
+
+        params = report.parameters
+        output_directory = params.destination / params.image_name
+        output_directory.mkdir(parents=True, exist_ok=True)
+        output_path_no_extension = output_directory / params.image_name
+        self.output_path = output_directory / f"{params.image_name}.zip"
+
+        print("\nConverting", self.temporary_image.mount, "->", self.output_path)
+        coffee = self._start_coffee()
+        try:
+            make_archive(
+                output_path_no_extension.as_posix(),
+                format="zip",
+                root_dir=self.temporary_image.mount,
+            )
+            report.output_files.append(self.output_path)
+            success = True
+        except Exception as e:
+            print("Error while creating ZIP file!")
+            print(f"{e}")
+            success = False
+        finally:
+            coffee.kill()
+
+        detach_result = self._detach_sparse_image(self.temporary_image)
+        # Try to remove the temporary image directory, if empty
+        self.temporary_image.path.unlink(missing_ok=True)
+        try:
+            self.temporary_image.path.parent.rmdir()
         except Exception:
             pass
 
@@ -501,15 +548,14 @@ class AcquisitionMethod(ABC):
             ):
                 output.write(line + "\n")
 
-    def _dmg_and_hash(self, report: Report) -> Report:
+    def _pack_and_hash(self, report: Report, format=OutputFormat.DMG) -> Report:
         if not self.temporary_image:
             return report
 
-        result = self._detach_sparse_image(self.temporary_image)
-        if not result:
-            return report
-
-        result = self._generate_dmg(report)
+        if format == OutputFormat.DMG:
+            result = self._generate_dmg(report)
+        else:
+            result = self._generate_zip(report)
         if not result:
             return report
 
