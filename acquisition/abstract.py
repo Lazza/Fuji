@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from shutil import move
+from shutil import copy
 from subprocess import Popen
 from typing import IO, List, Optional, Tuple
 
@@ -388,7 +388,7 @@ class AcquisitionMethod(ABC):
         print("\nMoving", temporary_output_path, "->", self.output_path)
         coffee = self._start_coffee()
         try:
-            move(temporary_output_path, self.output_path)
+            copy(temporary_output_path, self.output_path)
             report.output_files.append(self.output_path)
             success = True
         except Exception as e:
