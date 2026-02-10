@@ -27,15 +27,15 @@ class FoldersCheck(Check):
 
         if not same_path:
             if not tmp_is_directory:
-                result.write("Temp image location is not a directory!")
+                result.write("Temporary files location is not a directory!")
                 result.passed = False
             elif tmp_busy:
                 result.write(
-                    f"Temp image location already contains {params.image_name}!"
+                    f"Temporary files location already contains {params.image_name}!"
                 )
                 result.passed = False
             else:
-                result.write("Temp image location is a valid directory")
+                result.write("Temporary files location is a valid directory")
 
         if not destination_is_directory:
             result.write("Destination is not a directory!")

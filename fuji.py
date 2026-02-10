@@ -333,19 +333,19 @@ class InputWindow(wx.Frame):
         output_label = wx.StaticText(panel, label="Image name:")
         self.output_text = wx.TextCtrl(panel, value=PARAMS.image_name)
         self.output_text.Bind(wx.EVT_CHAR, self._validate_image_name)
-        source_label = wx.StaticText(panel, label="Source:")
+        source_label = wx.StaticText(panel, label="Source location:")
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
         # Add Devices button
         devices_button = wx.Button(panel, label="List of drives and partitions")
         devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
-        tmp_label = wx.StaticText(panel, label="Temp image location:")
+        tmp_label = wx.StaticText(panel, label="Temporary files:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
-        destination_label = wx.StaticText(panel, label="DMG destination:")
+        destination_label = wx.StaticText(panel, label="Output destination:")
         self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self._tmp_location_changed)
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
@@ -562,9 +562,9 @@ class OverviewWindow(wx.Frame):
             "Examiner": PARAMS.examiner,
             "Notes": PARAMS.notes,
             "Image name": PARAMS.image_name,
-            "Source": PARAMS.source,
-            "Temp image location": PARAMS.tmp,
-            "DMG destination": PARAMS.destination,
+            "Source location": PARAMS.source,
+            "Temporary files": PARAMS.tmp,
+            "Output destination": PARAMS.destination,
             "Acquisition method": INPUT_WINDOW.method.name,
         }
         if not RECOVERY:
