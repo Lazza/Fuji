@@ -199,11 +199,6 @@ class DevicesWindow(wx.Frame):
             if disk_space:
                 mount_point = disk_space.mount_point
                 used_str = humanize.naturalsize(disk_space.used_space)
-                if mount_point == "/":
-                    estimated_used = humanize.naturalsize(
-                        disk_space.size - disk_space.free_space
-                    )
-                    used_str = f"{estimated_used} (~)"
 
             index = self.list_ctrl.InsertItem(
                 index, f"{'  ' * line.indent}{line.identifier}"

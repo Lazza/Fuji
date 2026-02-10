@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import List
 import wx.lib.agw.hyperlink as hl
 
 from meta import RAMDISK_NAME, VOLUME_NAME
@@ -16,15 +17,29 @@ SOURCE_PATH: str = "/"
 
 if RECOVERY:
     mount_lines = command_to_properties(["mount"], separator=" on ")
-    sealed = [v.split("(")[0].strip() for v in mount_lines.values() if "sealed" in v]
-    for path in sealed:
+    candidates: List[str] = [
+        v.split("(")[0].strip()
+        for v in mount_lines.values()
+        if "apfs" in v.split("(")[1]
+    ]
+    # Find the OS_ROOT first
+    for path in candidates:
         canary_path = os.path.join(path, "usr/bin/rsync")
-        if os.path.exists(canary_path):
+        data_canary_path = os.path.join(path, ".fseventsd")
+        if os.path.exists(canary_path) and not os.path.exists(data_canary_path):
             OS_ROOT = path
-            OS_DATA = f"{path} - Data"
-            if os.path.exists(OS_DATA):
-                SOURCE_PATH = OS_DATA
             break
+    # Then find the data volume
+    for path in candidates:
+        data_canary_path = os.path.join(path, ".fseventsd")
+        if path.startswith(OS_ROOT) and os.path.exists(data_canary_path):
+            SOURCE_PATH = path
+            break
+else:
+    data_path = "/System/Volumes/Data"
+    data_canary_path = os.path.join(data_path, ".fseventsd")
+    if os.path.exists(data_canary_path):
+        SOURCE_PATH = data_path
 
 RSYNC_PATH: str = os.path.join(OS_ROOT, "usr/bin/rsync")
 SLURP_PATH: str = os.path.join(
@@ -134,12 +149,12 @@ class AdaptiveHyperLinkCtrl(hl.HyperLinkCtrl):
 
         # Apple Silicon macOS recovery
         safari_app = Path("/System/Cryptexes/App/System/Applications/Safari.app")
-        containers = Path("/System/Volumes/Data/private/var/root/Library/Containers/")
+        containers = Path("/System/Volumes/Data/private/var/root/Library/Containers")
 
         # Intel-based macOS recovery
         if not safari_app.exists():
             safari_app = Path("/Applications/Safari.app")
-            containers = Path("/private/var/root/Library/Containers/")
+            containers = Path("/private/var/root/Library/Containers")
 
         self.data_path = containers / "com.apple.Safari" / "Data"
         self.safari = safari_app / "Contents" / "MacOS" / "Safari"
