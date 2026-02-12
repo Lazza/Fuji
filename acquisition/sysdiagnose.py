@@ -82,6 +82,8 @@ class SysdiagnoseMethod(AcquisitionMethod):
     def _convert_logs(
         self, logarchive_path: Path, database_file: Path, buffer_size=1024000
     ) -> int:
+        print("\nRunning log show on", logarchive_path)
+
         # Create the database
         connection = sqlite3.connect(f"{database_file}")
         cursor = connection.cursor()
@@ -122,7 +124,7 @@ class SysdiagnoseMethod(AcquisitionMethod):
             """
         )
 
-        # Run log collect
+        # Run log show
         command = [
             "log",
             "show",
@@ -205,11 +207,22 @@ class SysdiagnoseMethod(AcquisitionMethod):
         if not status == 0:
             return report
 
-        folder_path = sysdiagnose_destination / folder_name
-        logarchive_path = folder_path / "system_logs.logarchive"
-        database_file = sysdiagnose_destination / "system_logs.db"
+        logarchive_path = sysdiagnose_destination / "unified_logs.logarchive"
 
-        print("\nRunning log show on", logarchive_path)
+        print("\nRunning log collect ->", logarchive_path)
+        command = [
+            "log",
+            "collect",
+            "--output",
+            logarchive_path.as_posix(),
+        ]
+        status = self._run_status(command)
+
+        if not status == 0:
+            return report
+
+        database_file = sysdiagnose_destination / "unified_logs.db"
+
         status = self._convert_logs(logarchive_path, database_file)
 
         if not status == 0:
