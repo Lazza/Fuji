@@ -102,15 +102,17 @@ class AcquisitionMethod(ABC):
             return ""
 
     def _create_shell_process(
-        self, arguments: List[str], awake=True, tee: Optional[Path] = None
+        self,
+        arguments: List[str],
+        awake=True,
+        redirect: Optional[Path] = None,
     ) -> Popen[str]:
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
 
         command = shlex.join(arguments) + " 2>&1"
-        if tee is not None:
-            tail = shlex.join(["tee", f"{tee}"])
-            command = f"{command} | {tail}"
+        if redirect is not None:
+            command = command + " > " + shlex.quote(redirect.as_posix())
 
         p = subprocess.Popen(
             command,
@@ -133,10 +135,9 @@ class AcquisitionMethod(ABC):
         arguments: List[str],
         awake=True,
         buffer_size=1024000,
-        tee: Optional[Path] = None,
     ) -> Tuple[int, str]:
         # Run a process in plain sight. Return its status code and output.
-        p = self._create_shell_process(arguments, awake=awake, tee=tee)
+        p = self._create_shell_process(arguments, awake=awake)
 
         stdout: IO[str] = p.stdout  # type: ignore
         encoding: str = stdout.encoding  # type: ignore
@@ -162,10 +163,9 @@ class AcquisitionMethod(ABC):
         arguments: List[str],
         awake=True,
         buffer_size=1024000,
-        tee: Optional[Path] = None,
     ) -> int:
         # Run a process in plain sight. Return its status code.
-        p = self._create_shell_process(arguments, awake=awake, tee=tee)
+        p = self._create_shell_process(arguments, awake=awake)
 
         stdout: IO[str] = p.stdout  # type: ignore
         encoding: str = stdout.encoding  # type: ignore
@@ -180,6 +180,22 @@ class AcquisitionMethod(ABC):
                 out = stdout.read()
                 sys.stdout.write(out)
                 break
+
+        return p.returncode
+
+    def _run_dots(
+        self, arguments: List[str], awake=True, redirect=Path(os.devnull)
+    ) -> int:
+        # Run a long process while showing some dots during execution
+        p = self._create_shell_process(arguments, awake=awake, redirect=redirect)
+
+        while True:
+            time.sleep(0.5)
+
+            if p.poll() != None:
+                break
+
+            print(".", end="")
 
         return p.returncode
 
