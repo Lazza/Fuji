@@ -1,10 +1,10 @@
-from dataclasses import dataclass
 import os
 import re
 import string
 import subprocess
 import sys
 import threading
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -16,9 +16,9 @@ from acquisition.asr import AsrMethod
 from acquisition.ditto import DittoMethod
 from acquisition.rsync import RsyncMethod
 from acquisition.sysdiagnose import SysdiagnoseMethod
-from checks.name import NameCheck
 from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
+from checks.name import NameCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 from shared.environment import RECOVERY, AdaptiveHyperLinkCtrl, attempt_ramdisk
@@ -29,6 +29,7 @@ from shared.utils import (
     command_to_properties,
     dedent,
     lines_to_properties,
+    set_font,
 )
 
 ALL_METHODS: List[AcquisitionMethod] = [
@@ -130,10 +131,7 @@ class DevicesWindow(wx.Frame):
         panel = wx.Panel(self)
 
         title = wx.StaticText(panel, label="List of drives and partitions")
-        title_font: wx.Font = title.GetFont()
-        title_font.SetPointSize(18)
-        title_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        title.SetFont(title_font)
+        set_font(title, size=18, weight=wx.FONTWEIGHT_BOLD)
 
         devices_label = wx.StaticText(
             panel,
@@ -306,15 +304,9 @@ class InputWindow(wx.Frame):
 
         # Components
         title = wx.StaticText(panel, label="Fuji")
-        title_font: wx.Font = title.GetFont()
-        title_font.SetPointSize(36)
-        title_font.SetWeight(wx.FONTWEIGHT_EXTRABOLD)
-        title.SetFont(title_font)
+        set_font(title, size=36, weight=wx.FONTWEIGHT_EXTRABOLD)
         desc = wx.StaticText(panel, label="Forensic Unattended Juicy Imaging")
-        desc_font: wx.Font = desc.GetFont()
-        desc_font.SetPointSize(18)
-        desc_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        desc.SetFont(desc_font)
+        set_font(desc, size=18, weight=wx.FONTWEIGHT_BOLD)
 
         byline_text = wx.StaticText(panel, label=f"Version {VERSION} by {AUTHOR}")
         byline_link = AdaptiveHyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
@@ -348,7 +340,9 @@ class InputWindow(wx.Frame):
         destination_label = wx.StaticText(panel, label="Output destination:")
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
-        self.destination_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self.on_destination_changed)
+        self.destination_picker.Bind(
+            wx.EVT_DIRPICKER_CHANGED, self.on_destination_changed
+        )
         if os.path.isdir(PARAMS.destination):
             self.destination_picker.SetPath(str(PARAMS.destination))
         method_label = wx.StaticText(panel, label="Acquisition method:")
@@ -520,10 +514,7 @@ class OverviewWindow(wx.Frame):
 
         # Components
         title = wx.StaticText(panel, label="Acquisition overview")
-        title_font: wx.Font = title.GetFont()
-        title_font.SetPointSize(18)
-        title_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        title.SetFont(title_font)
+        set_font(title, size=18, weight=wx.FONTWEIGHT_BOLD)
 
         # Overview grid container of 2 columns
         self.overview_grid = wx.FlexGridSizer(cols=2, hgap=20, vgap=10)
@@ -575,9 +566,7 @@ class OverviewWindow(wx.Frame):
         # Insert rows into the grid
         for label, value in data.items():
             label_text = wx.StaticText(self.panel, label=label)
-            label_text_font = label_text.GetFont()
-            label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
-            label_text.SetFont(label_text_font)
+            set_font(label_text, weight=wx.FONTWEIGHT_BOLD)
             value_text = wx.StaticText(
                 self.panel,
                 label=f"{value}",
@@ -591,9 +580,7 @@ class OverviewWindow(wx.Frame):
         for check in CHECKS:
             result = check.execute(PARAMS)
             label_text = wx.StaticText(self.panel, label=check.name)
-            label_text_font = label_text.GetFont()
-            label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
-            label_text.SetFont(label_text_font)
+            set_font(label_text, weight=wx.FONTWEIGHT_BOLD)
             if not result.passed:
                 label_text.SetForegroundColour(RED_COLOR)
             else:
@@ -639,10 +626,7 @@ class ProcessingWindow(wx.Frame):
 
         # Components
         self.title = wx.StaticText(self.panel, label="Acquisition in progress")
-        self.title_font: wx.Font = self.title.GetFont()
-        self.title_font.SetPointSize(18)
-        self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        self.title.SetFont(self.title_font)
+        set_font(self.title, size=18, weight=wx.FONTWEIGHT_BOLD)
         self.output_text = wx.TextCtrl(
             self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
         )
@@ -665,7 +649,6 @@ class ProcessingWindow(wx.Frame):
         # Reset initial status
         self.title.SetLabel("Acquisition in progress")
         self.title.SetForegroundColour(wx.NullColour)
-        self.title.SetFont(self.title_font)
         self.output_text.SetValue("")
 
         self.Show()
@@ -722,7 +705,6 @@ class ProcessingWindow(wx.Frame):
         else:
             self.title.SetLabel("Acquisition failed")
             self.title.SetForegroundColour(RED_COLOR)
-        self.title.SetFont(self.title_font)
         self.running = False
 
     def on_close(self, event):

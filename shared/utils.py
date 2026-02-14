@@ -2,6 +2,8 @@ import subprocess
 from datetime import datetime
 from typing import List, Optional
 
+from wx import Control, Font
+
 ACCENT_COLOR = (181, 78, 78)
 GREEN_COLOR = (34, 170, 54)
 RED_COLOR = (203, 11, 1)
@@ -42,3 +44,12 @@ def datetime_string(value: Optional[datetime]) -> str:
             timezone_name = ""
         iso_format = value.isoformat(sep=" ")
         return f"{iso_format}{timezone_name}"
+
+
+def set_font(widget: Control, size: Optional[int] = None, weight: Optional[int] = None):
+    font: Font = widget.GetFont()
+    if size is not None:
+        font.SetPointSize(size)
+    if weight is not None:
+        font.SetWeight(weight)
+    widget.SetFont(font)
