@@ -150,7 +150,7 @@ class DevicesWindow(wx.Frame):
             if not line.startswith("/dev/disk"):
                 continue
             identifier, size, used, free, _, _, _, _, mount_point = re.split(
-                "\s+", line, maxsplit=8
+                r"\s+", line, maxsplit=8
             )
             short_identifier: str = identifier[5:]
             mount_info[short_identifier] = DiskSpaceInfo(
