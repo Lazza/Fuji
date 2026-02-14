@@ -81,4 +81,4 @@ _[Getting Started with Fuji - The Logical Choice for Mac Imaging](https://www.yo
 
 
 [releases]: https://github.com/Lazza/Fuji/releases
-[docs]: https://fujiapp.top
+[docs]: https://fujiapp.top/docs
