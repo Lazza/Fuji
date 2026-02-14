@@ -1,29 +1,44 @@
-from dataclasses import dataclass
 import os
 import re
 import string
 import subprocess
 import sys
 import threading
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 import humanize
 import wx
-import wx.lib.agw.hyperlink as hl
 
 from acquisition.abstract import AcquisitionMethod, Parameters
 from acquisition.asr import AsrMethod
+from acquisition.ditto import DittoMethod
 from acquisition.rsync import RsyncMethod
 from acquisition.sysdiagnose import SysdiagnoseMethod
-from checks.name import NameCheck
 from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
+from checks.name import NameCheck
 from checks.network import NetworkCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
-from shared.utils import command_to_properties, lines_to_properties
+from shared.environment import RECOVERY, AdaptiveHyperLinkCtrl, attempt_ramdisk
+from shared.utils import (
+    ACCENT_COLOR,
+    GREEN_COLOR,
+    RED_COLOR,
+    command_to_properties,
+    dedent,
+    lines_to_properties,
+    set_font,
+)
 
-METHODS = [AsrMethod(), RsyncMethod(), SysdiagnoseMethod()]
+ALL_METHODS: List[AcquisitionMethod] = [
+    DittoMethod(),
+    RsyncMethod(),
+    AsrMethod(),
+    SysdiagnoseMethod(),
+]
+METHODS = [m for m in ALL_METHODS if m.available()]
 CHECKS = [NameCheck(), FoldersCheck(), FreeSpaceCheck(), NetworkCheck()]
 PARAMS = Parameters()
 
@@ -69,11 +84,13 @@ class DeviceInfo:
     size: str = ""
     identifier: str = ""
     status: str = ""
-    disk_space: DiskSpaceInfo = None
+    disk_space: Optional[DiskSpaceInfo] = None
 
 
 class DevicesWindow(wx.Frame):
-    def _parse_stanza(self, stanza: str, mount_info: dict) -> Iterable[DeviceInfo]:
+    def _parse_stanza(
+        self, stanza: str, mount_info: dict[str, DiskSpaceInfo]
+    ) -> Iterable[DeviceInfo]:
         lines = stanza.splitlines()
         first, second = lines[:2]
         status = ""
@@ -114,10 +131,7 @@ class DevicesWindow(wx.Frame):
         panel = wx.Panel(self)
 
         title = wx.StaticText(panel, label="List of drives and partitions")
-        title_font: wx.Font = title.GetFont()
-        title_font.SetPointSize(18)
-        title_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        title.SetFont(title_font)
+        set_font(title, size=18, weight=wx.FONTWEIGHT_BOLD)
 
         devices_label = wx.StaticText(
             panel,
@@ -128,15 +142,15 @@ class DevicesWindow(wx.Frame):
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
 
-        mount_info = {}
+        mount_info: dict[str, DiskSpaceInfo] = {}
         df_lines = subprocess.check_output(["df"], universal_newlines=True).splitlines()
         for line in df_lines:
             if not line.startswith("/dev/disk"):
                 continue
             identifier, size, used, free, _, _, _, _, mount_point = re.split(
-                "\s+", line, maxsplit=8
+                r"\s+", line, maxsplit=8
             )
-            short_identifier = identifier[5:]
+            short_identifier: str = identifier[5:]
             mount_info[short_identifier] = DiskSpaceInfo(
                 identifier=identifier,
                 size=int(size) * 512,
@@ -183,11 +197,6 @@ class DevicesWindow(wx.Frame):
             if disk_space:
                 mount_point = disk_space.mount_point
                 used_str = humanize.naturalsize(disk_space.used_space)
-                if mount_point == "/":
-                    estimated_used = humanize.naturalsize(
-                        disk_space.size - disk_space.free_space
-                    )
-                    used_str = f"{estimated_used} (~)"
 
             index = self.list_ctrl.InsertItem(
                 index, f"{'  ' * line.indent}{line.identifier}"
@@ -262,7 +271,7 @@ class DevicesWindow(wx.Frame):
         index = event.GetIndex()
         device: DeviceInfo = self.devices[index]
         if device.disk_space and device.disk_space.mount_point:
-            PARAMS.source = device.disk_space.mount_point
+            PARAMS.source = Path(device.disk_space.mount_point)
             self.parent.source_picker.SetPath(device.disk_space.mount_point)
             self.parent.source_picker.SetFocus()
 
@@ -280,12 +289,14 @@ class DevicesWindow(wx.Frame):
 
 class InputWindow(wx.Frame):
     method: AcquisitionMethod
+    devices_window: Optional["DevicesWindow"] = None
+    description_labels: List[str] = []
 
     def __init__(self):
         super().__init__(
             parent=None,
             title="Fuji - Forensic Unattended Juicy Imaging",
-            size=(600, 400),
+            size=(540, 400),
             style=wx.DEFAULT_FRAME_STYLE & ~(wx.RESIZE_BORDER | wx.MAXIMIZE_BOX),
         )
         self.EnableMaximizeButton(False)
@@ -293,19 +304,13 @@ class InputWindow(wx.Frame):
 
         # Components
         title = wx.StaticText(panel, label="Fuji")
-        title_font: wx.Font = title.GetFont()
-        title_font.SetPointSize(36)
-        title_font.SetWeight(wx.FONTWEIGHT_EXTRABOLD)
-        title.SetFont(title_font)
+        set_font(title, size=36, weight=wx.FONTWEIGHT_EXTRABOLD)
         desc = wx.StaticText(panel, label="Forensic Unattended Juicy Imaging")
-        desc_font: wx.Font = desc.GetFont()
-        desc_font.SetPointSize(18)
-        desc_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        desc.SetFont(desc_font)
+        set_font(desc, size=18, weight=wx.FONTWEIGHT_BOLD)
 
         byline_text = wx.StaticText(panel, label=f"Version {VERSION} by {AUTHOR}")
-        byline_link = hl.HyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
-        accent = wx.Colour(181, 78, 78)
+        byline_link = AdaptiveHyperLinkCtrl(panel, label=HOMEPAGE, URL=HOMEPAGE)
+        accent = wx.Colour(*ACCENT_COLOR)
         byline_link.SetColours(accent, accent, accent)
         byline_link.SetBold(True)
         byline_link.UpdateLink()
@@ -320,41 +325,41 @@ class InputWindow(wx.Frame):
         output_label = wx.StaticText(panel, label="Image name:")
         self.output_text = wx.TextCtrl(panel, value=PARAMS.image_name)
         self.output_text.Bind(wx.EVT_CHAR, self._validate_image_name)
-        source_label = wx.StaticText(panel, label="Source:")
+        source_label = wx.StaticText(panel, label="Source location:")
         self.source_picker = wx.DirPickerCtrl(panel)
         self.source_picker.SetInitialDirectory("/")
         self.source_picker.SetPath(str(PARAMS.source))
         # Add Devices button
         devices_button = wx.Button(panel, label="List of drives and partitions")
         devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
-        tmp_label = wx.StaticText(panel, label="Temp image location:")
+        tmp_label = wx.StaticText(panel, label="Temporary files:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
-        destination_label = wx.StaticText(panel, label="DMG destination:")
-        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self._tmp_location_changed)
+        destination_label = wx.StaticText(panel, label="Output destination:")
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
+        self.destination_picker.Bind(
+            wx.EVT_DIRPICKER_CHANGED, self.on_destination_changed
+        )
         if os.path.isdir(PARAMS.destination):
             self.destination_picker.SetPath(str(PARAMS.destination))
         method_label = wx.StaticText(panel, label="Acquisition method:")
         self.method_choice = wx.Choice(panel, choices=[m.name for m in METHODS])
+        self.method_choice.Bind(wx.EVT_CHOICE, self.on_method_changed)
         self.method_choice.SetSelection(0)
 
         # Prepare method descriptions
-        self.description_texts = []
         for method in METHODS:
-            description_label = f"<b>{method.name}:</b> {method.description}"
-            description_text = wx.StaticText(panel)
-            description_text.SetLabelMarkup(description_label)
-            self.description_texts.append(description_text)
+            description_label = f"<b>{method.name}:</b> {dedent(method.description)}"
+            self.description_labels.append(description_label)
 
         # Sound checkbox
         self.sound_checkbox = wx.CheckBox(
             panel, label="Play loud sound when acquisition is completed"
         )
-        self.sound_checkbox.SetValue(True)
+        self.sound_checkbox.SetValue(PARAMS.sound)
 
         # Buttons
         continue_btn = wx.Button(panel, label="Continue")
@@ -389,41 +394,70 @@ class InputWindow(wx.Frame):
         output_info.Add(self.source_picker, 1, wx.EXPAND)
         output_info.Add((0, 0))
         output_info.Add(devices_button, 0, wx.EXPAND)
-        output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        output_info.Add(self.tmp_picker, 1, wx.EXPAND)
         output_info.Add(destination_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.destination_picker, 1, wx.EXPAND)
+        output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        output_info.Add(self.tmp_picker, 1, wx.EXPAND)
         output_info.Add(method_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.method_choice, 1, wx.EXPAND)
         output_info.AddGrowableCol(1, 1)
 
         vbox.Add(output_info, 0, wx.EXPAND | wx.ALL, 10)
 
-        for description_text in self.description_texts:
-            vbox.Add(description_text, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.method_description = wx.StaticText(panel, style=wx.ALIGN_CENTRE_HORIZONTAL)
+        vbox.Add(self.method_description, 0, wx.EXPAND | wx.BOTTOM, 10)
+        self.describe_method(0)
 
         vbox.Add((0, 20))
-        vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+        if not RECOVERY:
+            vbox.Add(self.sound_checkbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
+        else:
+            self.sound_checkbox.Hide()
+
         vbox.Add(continue_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
+
+        vbox.SetMinSize(wx.Size(540, 0))
         panel.SetSizer(vbox)
 
         sizer = wx.BoxSizer(wx.VERTICAL)
         sizer.Add(panel)
         self.SetSizerAndFit(sizer)
+        self.Center()
 
-        # Bind close
-        self.Bind(wx.EVT_CLOSE, self.on_close)
+        # Bind close and create a menu bar
+        menu_bar = wx.MenuBar()
+        self.SetMenuBar(menu_bar)
+        self.Bind(wx.EVT_CLOSE, self.on_quit)
 
     def on_open_devices(self, event):
-        devices_window = DevicesWindow(self)
-        devices_window.Show()
-        devices_window.Move(64, 64)
+        if self.devices_window is not None:
+            self.devices_window.Raise()
+            return
+        self.devices_window = DevicesWindow(self)
+        self.devices_window.Show()
+        self.devices_window.CenterOnParent()
+        self.devices_window.Bind(wx.EVT_CLOSE, self.on_close_devices)
 
-    def on_tmp_location_changed(self, event):
-        temp_location = self.tmp_picker.GetPath()
+    def on_close_devices(self, event):
+        if self.devices_window:
+            self.devices_window.Destroy()
+        self.devices_window = None
+
+    def on_destination_changed(self, event):
         destination_location = self.destination_picker.GetPath()
-        if not destination_location:
-            self.destination_picker.SetPath(temp_location)
+        temp_location = self.tmp_picker.GetPath()
+        if not temp_location:
+            self.tmp_picker.SetPath(destination_location)
+
+    def on_method_changed(self, event):
+        method_index = self.method_choice.GetSelection()
+        self.describe_method(method_index)
+
+    def describe_method(self, index: int):
+        if index < len(self.description_labels):
+            self.method_description.SetLabelMarkup(self.description_labels[index])
+        self.Layout()
+        self.Fit()
 
     def _validate_image_name(self, event):
         key = event.GetKeyCode()
@@ -456,9 +490,16 @@ class InputWindow(wx.Frame):
         OVERVIEW_WINDOW.update_overview()
         OVERVIEW_WINDOW.Show()
 
-    def on_close(self, event):
-        app: wx.App = wx.GetApp()
-        app.ExitMainLoop()
+    def on_quit(self, event):
+        if PROCESSING_WINDOW.running:
+            wx.MessageBox(
+                "Cannot quit while an acquisition is in progress.",
+                "Acquisition in progress",
+                wx.OK | wx.ICON_INFORMATION,
+            )
+        else:
+            app = wx.GetApp()
+            app.ExitMainLoop()
 
 
 class OverviewWindow(wx.Frame):
@@ -473,10 +514,7 @@ class OverviewWindow(wx.Frame):
 
         # Components
         title = wx.StaticText(panel, label="Acquisition overview")
-        title_font: wx.Font = title.GetFont()
-        title_font.SetPointSize(18)
-        title_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        title.SetFont(title_font)
+        set_font(title, size=18, weight=wx.FONTWEIGHT_BOLD)
 
         # Overview grid container of 2 columns
         self.overview_grid = wx.FlexGridSizer(cols=2, hgap=20, vgap=10)
@@ -500,6 +538,7 @@ class OverviewWindow(wx.Frame):
         vbox.Add(hbox, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 20)
 
         panel.SetSizer(vbox)
+        self.Center()
         self.panel = panel
 
         # Bind close
@@ -514,21 +553,20 @@ class OverviewWindow(wx.Frame):
             "Examiner": PARAMS.examiner,
             "Notes": PARAMS.notes,
             "Image name": PARAMS.image_name,
-            "Source": PARAMS.source,
-            "Temp image location": PARAMS.tmp,
-            "DMG destination": PARAMS.destination,
+            "Source location": PARAMS.source,
+            "Output destination": PARAMS.destination,
+            "Temporary files": PARAMS.tmp,
             "Acquisition method": INPUT_WINDOW.method.name,
-            "Play sound": "Yes" if PARAMS.sound else "No",
         }
+        if not RECOVERY:
+            data["Play sound"] = "Yes" if PARAMS.sound else "No"
 
         max_text_width = 600
 
         # Insert rows into the grid
         for label, value in data.items():
             label_text = wx.StaticText(self.panel, label=label)
-            label_text_font = label_text.GetFont()
-            label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
-            label_text.SetFont(label_text_font)
+            set_font(label_text, weight=wx.FONTWEIGHT_BOLD)
             value_text = wx.StaticText(
                 self.panel,
                 label=f"{value}",
@@ -542,11 +580,11 @@ class OverviewWindow(wx.Frame):
         for check in CHECKS:
             result = check.execute(PARAMS)
             label_text = wx.StaticText(self.panel, label=check.name)
-            label_text_font = label_text.GetFont()
-            label_text_font.SetWeight(wx.FONTWEIGHT_BOLD)
-            label_text.SetFont(label_text_font)
+            set_font(label_text, weight=wx.FONTWEIGHT_BOLD)
             if not result.passed:
-                label_text.SetForegroundColour((240, 20, 20))
+                label_text.SetForegroundColour(RED_COLOR)
+            else:
+                label_text.SetForegroundColour(GREEN_COLOR)
             value_text = wx.StaticText(
                 self.panel,
                 label=result.message,
@@ -576,6 +614,8 @@ class OverviewWindow(wx.Frame):
 
 
 class ProcessingWindow(wx.Frame):
+    running = False
+
     def __init__(self):
         super().__init__(
             parent=None,
@@ -586,10 +626,7 @@ class ProcessingWindow(wx.Frame):
 
         # Components
         self.title = wx.StaticText(self.panel, label="Acquisition in progress")
-        self.title_font: wx.Font = self.title.GetFont()
-        self.title_font.SetPointSize(18)
-        self.title_font.SetWeight(wx.FONTWEIGHT_BOLD)
-        self.title.SetFont(self.title_font)
+        set_font(self.title, size=18, weight=wx.FONTWEIGHT_BOLD)
         self.output_text = wx.TextCtrl(
             self.panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.VSCROLL
         )
@@ -601,6 +638,7 @@ class ProcessingWindow(wx.Frame):
         vbox.Add(self.output_text, 1, wx.EXPAND | wx.ALL, 10)
 
         self.panel.SetSizer(vbox)
+        self.Center()
 
         # Bind close
         self.Bind(wx.EVT_CLOSE, self.on_close)
@@ -611,7 +649,6 @@ class ProcessingWindow(wx.Frame):
         # Reset initial status
         self.title.SetLabel("Acquisition in progress")
         self.title.SetForegroundColour(wx.NullColour)
-        self.title.SetFont(self.title_font)
         self.output_text.SetValue("")
 
         self.Show()
@@ -648,9 +685,8 @@ class ProcessingWindow(wx.Frame):
             ["osascript", "-e", "get volume settings"], universal_newlines=True
         )
         volume_properties = lines_to_properties(volume_settings.split(","))
-        try:
-            current_volume = int(volume_properties.get("output volume"))
-        except:
+        current_volume = int(volume_properties.get("output volume", -1))
+        if current_volume < 0:
             # Keep reasonable volume
             current_volume = 50
         scaled = MAX_VOLUME * (current_volume / 100.0)
@@ -665,11 +701,10 @@ class ProcessingWindow(wx.Frame):
     def set_completion_status(self, success):
         if success:
             self.title.SetLabel("Acquisition completed")
-            self.title.SetForegroundColour((20, 240, 20))
+            self.title.SetForegroundColour(GREEN_COLOR)
         else:
             self.title.SetLabel("Acquisition failed")
-            self.title.SetForegroundColour((240, 20, 20))
-        self.title.SetFont(self.title_font)
+            self.title.SetForegroundColour(RED_COLOR)
         self.running = False
 
     def on_close(self, event):
@@ -679,6 +714,10 @@ class ProcessingWindow(wx.Frame):
 
 
 if __name__ == "__main__":
+    if RECOVERY:
+        # Attempt to migrate to a RAM disk
+        attempt_ramdisk()
+
     # Try to find the serial number
     information = command_to_properties(
         ["ioreg", "-rd1", "-c", "IOPlatformExpertDevice"],

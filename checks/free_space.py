@@ -58,15 +58,13 @@ class FreeSpaceCheck(Check):
             destination_needed_readable = humanize.naturalsize(source_used)
             destination_free_readable = humanize.naturalsize(destination_free)
 
-            result.passed = tmp_passed and destination_passed
+            result.passed = bool(tmp_passed) and bool(destination_passed)
             tmp_tail = f"(up to {tmp_needed_readable} / {tmp_free_readable})"
             if tmp_passed:
-                result.write(
-                    f"Free space in temp image location seems enough {tmp_tail}"
-                )
+                result.write(f"Free space for temporary files seems enough {tmp_tail}")
             else:
                 result.write(
-                    f"Free space in temp image location could be insufficient {tmp_tail}"
+                    f"Free space for temporary files could be insufficient {tmp_tail}"
                 )
 
             destination_tail = (

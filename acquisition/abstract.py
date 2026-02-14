@@ -1,3 +1,4 @@
+from enum import Enum
 import hashlib
 import os
 import re
@@ -10,11 +11,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from shutil import copy, make_archive
 from subprocess import Popen
-from typing import IO, List, Tuple
+from typing import IO, List, Optional, Tuple
 
 from meta import AUTHOR, VERSION
-from shared.utils import command_to_properties, lines_to_properties
+from shared.environment import RECOVERY, SOURCE_PATH
+from shared.utils import datetime_string, lines_to_properties
 
 
 @dataclass
@@ -23,10 +26,10 @@ class Parameters:
     examiner: str = ""
     notes: str = ""
     image_name: str = "Mac_Acquisition"
-    source: Path = Path("/")
+    source: Path = Path(SOURCE_PATH)
     tmp: Path = Path("/Volumes/Fuji")
     destination: Path = Path("/Volumes/Fuji")
-    sound: bool = True
+    sound: bool = not RECOVERY
 
 
 @dataclass
@@ -53,24 +56,38 @@ class HashedFile:
 class Report:
     parameters: Parameters
     method: "AcquisitionMethod"
-    start_time: datetime = None
-    end_time: datetime = None
-    path_details: PathDetails = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    path_details: PathDetails = None  # type: ignore
     hardware_info: str = ""
     success: bool = False
     output_files: List[Path] = field(default_factory=list)
-    result: HashedFile = None
+    result: HashedFile = None  # type: ignore
+
+
+@dataclass
+class SparseInfo:
+    path: Path
+    container: str
+    volume: str
+    mount: str
+
+
+class OutputFormat(Enum):
+    DMG = 1
+    ZIP = 2
 
 
 class AcquisitionMethod(ABC):
     name = "Abstract method"
     description = "This method cannot be used directly"
 
-    temporary_path: Path = None
-    temporary_container: str = None
-    temporary_volume: str = None
-    temporary_mount: str = None
-    output_path: Path = None
+    temporary_image: Optional[SparseInfo] = None
+    output_path: Path
+
+    def available(self) -> bool:
+        """Returns whether the acquisition method is available."""
+        return True
 
     def _limited_read(self, file: IO[str], limit: int, encoding: str) -> str:
         sel = selectors.DefaultSelector()
@@ -85,15 +102,17 @@ class AcquisitionMethod(ABC):
             return ""
 
     def _create_shell_process(
-        self, arguments: List[str], awake=True, tee: Path = None
+        self,
+        arguments: List[str],
+        awake=True,
+        redirect: Optional[Path] = None,
     ) -> Popen[str]:
         if awake:
             arguments = ["caffeinate", "-dimsu"] + arguments
 
         command = shlex.join(arguments) + " 2>&1"
-        if tee is not None:
-            tail = shlex.join(["tee", f"{tee}"])
-            command = f"{command} | {tail}"
+        if redirect is not None:
+            command = command + " > " + shlex.quote(redirect.as_posix())
 
         p = subprocess.Popen(
             command,
@@ -112,23 +131,27 @@ class AcquisitionMethod(ABC):
         return p.returncode, p.stdout
 
     def _run_process(
-        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+        self,
+        arguments: List[str],
+        awake=True,
+        buffer_size=1024000,
     ) -> Tuple[int, str]:
         # Run a process in plain sight. Return its status code and output.
-        p = self._create_shell_process(arguments, awake=awake, tee=tee)
+        p = self._create_shell_process(arguments, awake=awake)
 
-        encoding = p.stdout.encoding
+        stdout: IO[str] = p.stdout  # type: ignore
+        encoding: str = stdout.encoding  # type: ignore
         output = ""
         while True:
             # Let it breathe and avoid the UI getting stuck
             time.sleep(0.1)
-            out = self._limited_read(p.stdout, buffer_size, encoding)
+            out = self._limited_read(stdout, buffer_size, encoding)
             if out:
                 sys.stdout.write(out)
                 output = output + out
 
             if p.poll() != None:
-                out = p.stdout.read()
+                out = stdout.read()
                 sys.stdout.write(out)
                 output = output + out
                 break
@@ -136,23 +159,43 @@ class AcquisitionMethod(ABC):
         return p.returncode, output
 
     def _run_status(
-        self, arguments: List[str], awake=True, buffer_size=1024000, tee: Path = None
+        self,
+        arguments: List[str],
+        awake=True,
+        buffer_size=1024000,
     ) -> int:
         # Run a process in plain sight. Return its status code.
-        p = self._create_shell_process(arguments, awake=awake, tee=tee)
+        p = self._create_shell_process(arguments, awake=awake)
 
-        encoding = p.stdout.encoding
+        stdout: IO[str] = p.stdout  # type: ignore
+        encoding: str = stdout.encoding  # type: ignore
         while True:
             # Let it breathe and avoid the UI getting stuck
             time.sleep(0.1)
-            out = self._limited_read(p.stdout, buffer_size, encoding)
+            out = self._limited_read(stdout, buffer_size, encoding)
             if out:
                 sys.stdout.write(out)
 
             if p.poll() != None:
-                out = p.stdout.read()
+                out = stdout.read()
                 sys.stdout.write(out)
                 break
+
+        return p.returncode
+
+    def _run_dots(
+        self, arguments: List[str], awake=True, redirect=Path(os.devnull)
+    ) -> int:
+        # Run a long process while showing some dots during execution
+        p = self._create_shell_process(arguments, awake=awake, redirect=redirect)
+
+        while True:
+            time.sleep(0.5)
+
+            if p.poll() != None:
+                break
+
+            print(".", end="")
 
         return p.returncode
 
@@ -163,9 +206,14 @@ class AcquisitionMethod(ABC):
         return "/dev/disk" + chunk
 
     def _find_mount_point(self, path: Path) -> Path:
-        path = os.path.realpath(path)
-        while not os.path.ismount(path):
-            path = os.path.dirname(path)
+        path = Path(os.path.realpath(path))
+        while not path.is_mount():
+            path = path.parent
+
+        # Special case for avoiding bugs in recovery environment
+        if RECOVERY and len(path.parts) > 3 and path.parts[1] == "Volumes":
+            path = path.parent
+
         return path
 
     def _gather_path_info(self, path: Path) -> PathDetails:
@@ -220,9 +268,11 @@ class AcquisitionMethod(ABC):
         )
         return hardware_info
 
-    def _create_temporary_image(self, report: Report) -> bool:
+    def _create_sparse_image(
+        self, report: Report, base: Path, suffix: str = ""
+    ) -> Optional[SparseInfo]:
         params = report.parameters
-        output_directory = params.tmp / params.image_name
+        output_directory = base / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
 
         best_filesystem = "HFS+"
@@ -232,11 +282,9 @@ class AcquisitionMethod(ABC):
         # Add a bit of extra space to ensure the destination is large enough
         extra_gigabyte_sectors = 2 * 10**6
         sectors = report.path_details.disk_sectors + extra_gigabyte_sectors
-        self.temporary_path = output_directory / f"{params.image_name}.sparseimage"
+        temporary_path = output_directory / f"{params.image_name}{suffix}.sparseimage"
 
-        image_path: str = f"{self.temporary_path}"
-        self.temporary_container = None
-        self.temporary_volume = None
+        image_path: str = f"{temporary_path}"
         result, output = self._run_process(
             [
                 "hdiutil",
@@ -251,7 +299,7 @@ class AcquisitionMethod(ABC):
             ],
         )
         if result > 0:
-            return False
+            return None
 
         result, output = self._run_process(["hdiutil", "attach", image_path])
         output_lines = output.strip().splitlines()
@@ -264,57 +312,164 @@ class AcquisitionMethod(ABC):
         success = result == 0 and len(volume_lines) > 0
         if success:
             container_line = container_lines[0]
-            parts = re.split("\s+", container_line, maxsplit=2)
-            self.temporary_container = parts[0]
+            parts = re.split(r"\s+", container_line, maxsplit=2)
+            temporary_container = parts[0]
 
             mount_line = volume_lines[0]
-            parts = re.split("\s+", mount_line, maxsplit=2)
-            self.temporary_volume = parts[0]
-            self.temporary_mount = parts[2]
+            parts = re.split(r"\s+", mount_line, maxsplit=2)
+            temporary_volume = parts[0]
+            temporary_mount = parts[2]
 
-            report.output_files.append(self.temporary_path)
+            report.output_files.append(temporary_path)
             # Write preliminary report
             self._write_report(report)
 
-        return success
+            image_info = SparseInfo(
+                path=temporary_path,
+                container=temporary_container,
+                volume=temporary_volume,
+                mount=temporary_mount,
+            )
+            return image_info
 
-    def _detach_temporary_image(self, delay=10, interval=5, attempts=20) -> bool:
-        print("\nWaiting to detach temporary image...")
+        return None
+
+    def _create_temporary_image(self, report: Report) -> Optional[SparseInfo]:
+        # Temporary image is placed in the destination directory
+        base = report.parameters.destination
+        info = self._create_sparse_image(report, base=base, suffix="-temporary")
+        self.temporary_image = info
+        return info
+
+    def _create_conversion_image(self, report: Report) -> Optional[SparseInfo]:
+        # Conversion image is placed in the temporary directory
+        base = report.parameters.tmp
+        info = self._create_sparse_image(report, base=base, suffix="-conversion")
+        return info
+
+    def _detach_sparse_image(
+        self, image: SparseInfo, delay=10, interval=5, attempts=20
+    ) -> bool:
+        print(f"\nWaiting to detach {image.volume}...")
         time.sleep(delay)
 
         i = 1
         while True:
-            result = self._run_status(["hdiutil", "detach", self.temporary_volume])
+            result = self._run_status(["hdiutil", "detach", image.volume])
             if result == 0:
                 break
             i = i + 1
             if i == attempts:
-                print("Failed to detach temporary image!")
+                print("Failed to detach image!")
                 return False
             time.sleep(interval)
 
         # This could be automatically unmounted, we don't check for success
-        _ = self._run_status(["hdiutil", "detach", self.temporary_container])
+        self._run_silent(["hdiutil", "detach", "-force", image.container])
         return True
 
+    def _start_coffee(self) -> Popen:
+        # Some processes need to be caffeinated manually, for long computations
+        # done directly via our Python code. We start a caffeinate instance with
+        # a very long duration (7 days) and kill it after the process is over.
+
+        one_week = 60 * 60 * 24 * 7
+        coffee: Popen = subprocess.Popen(["caffeinate", "-dimsu", "-t", f"{one_week}"])
+        return coffee
+
     def _generate_dmg(self, report: Report) -> bool:
+        if not self.temporary_image:
+            return False
+
+        result = self._detach_sparse_image(self.temporary_image)
+        if not result:
+            return False
+
         params = report.parameters
         output_directory = params.destination / params.image_name
         output_directory.mkdir(parents=True, exist_ok=True)
-        self.output_path = output_directory / f"{params.image_name}.dmg"
+        final_image_name = f"{params.image_name}.dmg"
+        self.output_path = output_directory / final_image_name
 
-        print("\nConverting", self.temporary_path, "->", self.output_path)
-        sparseimage = f"{self.temporary_path}"
-        dmg = f"{self.output_path}"
+        conversion_image = self._create_conversion_image(report)
+        if not conversion_image:
+            return False
+
+        temporary_output_path = Path(conversion_image.mount) / final_image_name
+        print("\nConverting", self.temporary_image.path, "->", temporary_output_path)
+        sparseimage = f"{self.temporary_image.path}"
+        dmg = f"{temporary_output_path}"
         result = self._run_status(
             ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
         )
-
         success = result == 0
-        if success:
-            report.output_files.append(self.output_path)
 
-        return success
+        if not success:
+            return False
+
+        # Remove the temporary image and free up space for the DMG
+        self.temporary_image.path.unlink(missing_ok=True)
+
+        # Copy file to final destination
+        print("\nMoving", temporary_output_path, "->", self.output_path)
+        coffee = self._start_coffee()
+        try:
+            copy(temporary_output_path, self.output_path)
+            report.output_files.append(self.output_path)
+            success = True
+        except Exception as e:
+            print("Error while moving DMG to final destination!")
+            print(f"{e}")
+            success = False
+        finally:
+            coffee.kill()
+
+        detach_result = self._detach_sparse_image(conversion_image)
+        # Try to remove the conversion image directory, if empty
+        conversion_image.path.unlink(missing_ok=True)
+        try:
+            conversion_image.path.parent.rmdir()
+        except Exception:
+            pass
+
+        return success and detach_result
+
+    def _generate_zip(self, report: Report) -> bool:
+        if not self.temporary_image:
+            return False
+
+        params = report.parameters
+        output_directory = params.destination / params.image_name
+        output_directory.mkdir(parents=True, exist_ok=True)
+        output_path_no_extension = output_directory / params.image_name
+        self.output_path = output_directory / f"{params.image_name}.zip"
+
+        print("\nConverting", self.temporary_image.mount, "->", self.output_path)
+        coffee = self._start_coffee()
+        try:
+            make_archive(
+                output_path_no_extension.as_posix(),
+                format="zip",
+                root_dir=self.temporary_image.mount,
+            )
+            report.output_files.append(self.output_path)
+            success = True
+        except Exception as e:
+            print("Error while creating ZIP file!")
+            print(f"{e}")
+            success = False
+        finally:
+            coffee.kill()
+
+        detach_result = self._detach_sparse_image(self.temporary_image)
+        # Try to remove the temporary image directory, if empty
+        self.temporary_image.path.unlink(missing_ok=True)
+        try:
+            self.temporary_image.path.parent.rmdir()
+        except Exception:
+            pass
+
+        return success and detach_result
 
     def _compute_hashes(self, path: Path) -> HashedFile:
         print("\nHashing", path)
@@ -328,13 +483,7 @@ class AcquisitionMethod(ABC):
         sha256 = hashlib.sha256()
         md5 = hashlib.md5()
 
-        # The process needs to be caffeinated manually, because the hashing
-        # function is done directly via our Python code. We start a caffeinate
-        # instance with a very long duration (7 days) and terminate after the
-        # process is completed.
-
-        one_week = 60 * 60 * 24 * 7
-        coffee = subprocess.Popen(["caffeinate", "-dimsu", "-t", f"{one_week}"])
+        coffee = self._start_coffee()
 
         try:
             with open(path, "rb") as f:
@@ -374,7 +523,7 @@ class AcquisitionMethod(ABC):
         if len(report.output_files):
             output_files = [
                 separator,
-                "Generated files:",
+                "Generated artifacts (including temporary ones):",
             ] + [f"    - {file}" for file in report.output_files]
 
         hashes = []
@@ -398,10 +547,11 @@ class AcquisitionMethod(ABC):
                     f"Examiner: {report.parameters.examiner}",
                     f"Notes: {report.parameters.notes}",
                     separator,
-                    f"Start time: {report.start_time}",
-                    f"End time: {report.end_time}",
+                    f"Start time: {datetime_string(report.start_time)}",
+                    f"End time: {datetime_string(report.end_time)}",
                     f"Source: {report.parameters.source}",
                     f"Acquisition method: {report.method.name}",
+                    f"Running in recovery environment: {'Yes' if RECOVERY else 'No'}",
                     separator,
                     report.hardware_info,
                     separator,
@@ -414,12 +564,22 @@ class AcquisitionMethod(ABC):
             ):
                 output.write(line + "\n")
 
-    def _dmg_and_hash(self, report: Report) -> Report:
-        result = self._detach_temporary_image()
-        if not result:
+    def _initialize_report(self, params: Parameters) -> Report:
+        report = Report(params, self, start_time=datetime.now())
+        report.path_details = self._gather_path_info(params.source)
+        report.hardware_info = self._gather_hardware_info()
+        # Preliminary report
+        self._write_report(report)
+        return report
+
+    def _pack_and_hash(self, report: Report, format=OutputFormat.DMG) -> Report:
+        if not self.temporary_image:
             return report
 
-        result = self._generate_dmg(report)
+        if format == OutputFormat.DMG:
+            result = self._generate_dmg(report)
+        else:
+            result = self._generate_zip(report)
         if not result:
             return report
 
@@ -427,7 +587,7 @@ class AcquisitionMethod(ABC):
         report.result = self._compute_hashes(self.output_path)
         report.success = True
         report.end_time = datetime.now()
-
+        # Final report
         self._write_report(report)
 
         print("\nAcquisition completed!")

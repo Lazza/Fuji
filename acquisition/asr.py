@@ -5,26 +5,24 @@ from acquisition.abstract import AcquisitionMethod, Parameters, Report
 class AsrMethod(AcquisitionMethod):
     name = "ASR"
     description = """Apple Software Restore logical acquisition.
-    This is the recommended option, but it works only for volumes."""
+    This is quite fast but less reliable, and it works only for volumes."""
 
     def execute(self, params: Parameters) -> Report:
         # Prepare report
-        report = Report(params, self, start_time=datetime.now())
-        report.path_details = self._gather_path_info(params.source)
-        report.hardware_info = self._gather_hardware_info()
+        report = self._initialize_report(params)
 
-        success = self._create_temporary_image(report)
-        if not success:
+        temporary_image = self._create_temporary_image(report)
+        if not temporary_image:
             return report
 
-        print("\nASR", params.source, "->", self.temporary_volume)
+        print("\nASR", params.source, "->", temporary_image.volume)
         command = [
             "asr",
             "restore",
             "--source",
             f"{params.source}",
             "--target",
-            self.temporary_volume,
+            temporary_image.volume,
             "--noprompt",
             "--erase",
         ]
@@ -38,4 +36,4 @@ class AsrMethod(AcquisitionMethod):
         if not success:
             return report
 
-        return self._dmg_and_hash(report)
+        return self._pack_and_hash(report)

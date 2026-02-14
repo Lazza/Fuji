@@ -3,12 +3,16 @@ from pathlib import Path
 from typing import List
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
+from shared.environment import RECOVERY, RSYNC_PATH
 
 
 class RsyncMethod(AcquisitionMethod):
     name = "Rsync"
     description = """Files and directories are copied using Rsync.
-    This is slower but it can be used on any source directory. Errors are ignored."""
+    This is a bit slow but it can be used on any source directory. Errors are ignored."""
+
+    def available(self) -> bool:
+        return not RECOVERY
 
     def _compute_exclusions(self, params: Parameters) -> List[Path]:
         # Rsync can be tricked into acquiring files multiple times by macOS, due
@@ -37,25 +41,23 @@ class RsyncMethod(AcquisitionMethod):
 
     def execute(self, params: Parameters) -> Report:
         # Prepare report
-        report = Report(params, self, start_time=datetime.now())
-        report.path_details = self._gather_path_info(params.source)
-        report.hardware_info = self._gather_hardware_info()
+        report = self._initialize_report(params)
 
         print("Computing exclusions...")
         exclusions = self._compute_exclusions(params)
 
-        success = self._create_temporary_image(report)
-        if not success:
+        temporary_image = self._create_temporary_image(report)
+        if not temporary_image:
             return report
 
-        print("\nRsync", params.source, "->", self.temporary_mount)
+        print("\nRsync", params.source, "->", temporary_image.mount)
         source_str = f"{params.source}"
         if not source_str.endswith("/"):
             source_str = source_str + "/"
-        command = ["rsync", "-xrlptgoEv", "--progress"]
+        command = [RSYNC_PATH, "-xrlptgoEv", "--progress"]
         for exclusion in exclusions:
             command.extend(["--exclude", f"{exclusion}/"])
-        command.extend([source_str, self.temporary_mount])
+        command.extend([source_str, temporary_image.mount])
         status = self._run_status(command)
 
         # We cannot rely on the exit code, because it will probably contain some
@@ -65,4 +67,4 @@ class RsyncMethod(AcquisitionMethod):
         else:
             print("Rsync terminated")
 
-        return self._dmg_and_hash(report)
+        return self._pack_and_hash(report)
