@@ -12,14 +12,14 @@
 
   <h3>MacOS forensic acquisition made simple</h3>
 
-  <img width="484" src="./packaging/screenshot.png">
+  <img width="522" src="./packaging/screenshot.png">
 
 </div>
 
 
 ## About
 
-Fuji is a free, open source program for performing forensic acquisition of Mac
+Fuji is a free, open-source program for performing forensic acquisition of Mac
 computers. It should work on any modern Intel or Apple Silicon device, as it
 leverages standard executables provided by macOS.
 
@@ -51,7 +51,7 @@ The development of Fuji is empowered by the support of:
     </tr>
 </table>
 
-If you find my work in open source digital forensics valuable, please consider
+If you find my work in open-source digital forensics valuable, please consider
 supporting it with a donation. Your contributions help sustain the development
 and maintenance of tools like Fuji.
 
