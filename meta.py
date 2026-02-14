@@ -1,5 +1,5 @@
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 AUTHOR = "Andrea Lazzarotto"
-HOMEPAGE = "https://andrealazzarotto.com"
+HOMEPAGE = "https://fujiapp.top"
 VOLUME_NAME = "FujiApp"
 RAMDISK_NAME = "FujiRAMDisk"
