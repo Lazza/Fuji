@@ -346,9 +346,9 @@ class InputWindow(wx.Frame):
         if os.path.isdir(PARAMS.tmp):
             self.tmp_picker.SetPath(str(PARAMS.tmp))
         destination_label = wx.StaticText(panel, label="Output destination:")
-        self.tmp_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self._tmp_location_changed)
         self.destination_picker = wx.DirPickerCtrl(panel)
         self.destination_picker.SetInitialDirectory("/Volumes")
+        self.destination_picker.Bind(wx.EVT_DIRPICKER_CHANGED, self.on_destination_changed)
         if os.path.isdir(PARAMS.destination):
             self.destination_picker.SetPath(str(PARAMS.destination))
         method_label = wx.StaticText(panel, label="Acquisition method:")
@@ -400,10 +400,10 @@ class InputWindow(wx.Frame):
         output_info.Add(self.source_picker, 1, wx.EXPAND)
         output_info.Add((0, 0))
         output_info.Add(devices_button, 0, wx.EXPAND)
-        output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        output_info.Add(self.tmp_picker, 1, wx.EXPAND)
         output_info.Add(destination_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.destination_picker, 1, wx.EXPAND)
+        output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        output_info.Add(self.tmp_picker, 1, wx.EXPAND)
         output_info.Add(method_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.method_choice, 1, wx.EXPAND)
         output_info.AddGrowableCol(1, 1)
@@ -449,11 +449,11 @@ class InputWindow(wx.Frame):
             self.devices_window.Destroy()
         self.devices_window = None
 
-    def on_tmp_location_changed(self, event):
-        temp_location = self.tmp_picker.GetPath()
+    def on_destination_changed(self, event):
         destination_location = self.destination_picker.GetPath()
-        if not destination_location:
-            self.destination_picker.SetPath(temp_location)
+        temp_location = self.tmp_picker.GetPath()
+        if not temp_location:
+            self.tmp_picker.SetPath(destination_location)
 
     def on_method_changed(self, event):
         method_index = self.method_choice.GetSelection()
@@ -563,8 +563,8 @@ class OverviewWindow(wx.Frame):
             "Notes": PARAMS.notes,
             "Image name": PARAMS.image_name,
             "Source location": PARAMS.source,
-            "Temporary files": PARAMS.tmp,
             "Output destination": PARAMS.destination,
+            "Temporary files": PARAMS.tmp,
             "Acquisition method": INPUT_WINDOW.method.name,
         }
         if not RECOVERY:
