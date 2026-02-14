@@ -10,7 +10,7 @@
   <a class="badge-chip" href="https://project-types.github.io/#stadium"><img alt="Stadium badge" src="https://badgen.net/static/project type/stadium/orange"></a>
   <a class="badge-chip" href="https://ko-fi.com/thelazza"><img alt="Donate on Ko-fi" src="https://badgen.net/static/ko-fi/donate/yellow"></a></p>
 
-  <h3>MacOS forensic acquisition made simple</h3>
+  <h3>macOS forensic acquisition made simple</h3>
 
   <img width="522" src="./packaging/screenshot.png">
 
