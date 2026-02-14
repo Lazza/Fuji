@@ -51,11 +51,7 @@ class SysdiagnoseMethod(AcquisitionMethod):
 
     def execute(self, params: Parameters) -> Report:
         # Prepare report
-        report = Report(params, self, start_time=datetime.now())
-        report.path_details = self._gather_path_info(params.source)
-        report.hardware_info = self._gather_hardware_info()
-        # Write preliminary report
-        self._write_report(report)
+        report = self._initialize_report(params)
 
         temporary_image = self._create_temporary_image(report)
         if not temporary_image:

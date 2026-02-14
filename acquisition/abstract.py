@@ -564,6 +564,14 @@ class AcquisitionMethod(ABC):
             ):
                 output.write(line + "\n")
 
+    def _initialize_report(self, params: Parameters) -> Report:
+        report = Report(params, self, start_time=datetime.now())
+        report.path_details = self._gather_path_info(params.source)
+        report.hardware_info = self._gather_hardware_info()
+        # Preliminary report
+        self._write_report(report)
+        return report
+
     def _pack_and_hash(self, report: Report, format=OutputFormat.DMG) -> Report:
         if not self.temporary_image:
             return report
@@ -579,7 +587,7 @@ class AcquisitionMethod(ABC):
         report.result = self._compute_hashes(self.output_path)
         report.success = True
         report.end_time = datetime.now()
-
+        # Final report
         self._write_report(report)
 
         print("\nAcquisition completed!")
