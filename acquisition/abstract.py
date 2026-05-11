@@ -1,6 +1,7 @@
 from enum import Enum
 import hashlib
 import os
+import pty
 import re
 import selectors
 import shlex
@@ -95,7 +96,11 @@ class AcquisitionMethod(ABC):
 
         events = sel.select(0.125)
         if events:
-            data = os.read(file.fileno(), limit)
+            try:
+                data = os.read(file.fileno(), limit)
+            except OSError:
+                # Pty master returns EIO on Linux once the slave is closed.
+                return ""
             return data.decode(encoding, "ignore")
         else:
             # Timeout occurred
@@ -113,13 +118,26 @@ class AcquisitionMethod(ABC):
         command = shlex.join(arguments) + " 2>&1"
         if redirect is not None:
             command = command + " > " + shlex.quote(redirect.as_posix())
+            return subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                shell=True,
+                universal_newlines=True,
+            )
 
+        # Run the child under a pseudo-tty so tools that detect a non-tty stdout
+        # (rsync --progress, asr, hdiutil) line-flush their progress output
+        # instead of block-buffering it. Without a pty the progress appears
+        # stuck until the child's stdio buffer fills or the process exits.
+        master_fd, slave_fd = pty.openpty()
         p = subprocess.Popen(
             command,
-            stdout=subprocess.PIPE,
+            stdout=slave_fd,
+            stderr=slave_fd,
             shell=True,
-            universal_newlines=True,
         )
+        os.close(slave_fd)
+        p.stdout = os.fdopen(master_fd, "r", encoding="utf-8", errors="replace")
         return p
 
     def _run_silent(self, arguments: List[str], awake=True) -> Tuple[int, str]:
@@ -151,7 +169,10 @@ class AcquisitionMethod(ABC):
                 output = output + out
 
             if p.poll() != None:
-                out = stdout.read()
+                try:
+                    out = stdout.read()
+                except OSError:
+                    out = ""
                 sys.stdout.write(out)
                 output = output + out
                 break
@@ -177,7 +198,10 @@ class AcquisitionMethod(ABC):
                 sys.stdout.write(out)
 
             if p.poll() != None:
-                out = stdout.read()
+                try:
+                    out = stdout.read()
+                except OSError:
+                    out = ""
                 sys.stdout.write(out)
                 break
 
