@@ -21,9 +21,16 @@ from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.name import NameCheck
 from checks.network import NetworkCheck
+from checks.readonly import ReadOnlySourceCheck
 from checks.running_apps import RunningAppsCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
 from shared.environment import RECOVERY, AdaptiveHyperLinkCtrl, attempt_ramdisk
+from shared.filevault import (
+    EncryptedVolume,
+    UnlockError,
+    list_encrypted_volumes,
+    unlock_volume_readonly,
+)
 from shared.utils import (
     ACCENT_COLOR,
     GREEN_COLOR,
@@ -46,6 +53,7 @@ ALL_CHECKS: List[Check] = [
     FoldersCheck(),
     FreeSpaceCheck(),
     NetworkCheck(),
+    ReadOnlySourceCheck(),
     RunningAppsCheck(),
 ]
 CHECKS = [c for c in ALL_CHECKS if c.active()]
@@ -94,6 +102,8 @@ class DeviceInfo:
     identifier: str = ""
     status: str = ""
     disk_space: Optional[DiskSpaceInfo] = None
+    filevault_status: str = ""
+    is_locked: bool = False
 
 
 class DevicesWindow(wx.Frame):
@@ -138,6 +148,7 @@ class DevicesWindow(wx.Frame):
         super().__init__(parent, title="Fuji - Drives and partitions")
         self.parent = parent
         panel = wx.Panel(self)
+        self._panel = panel
 
         title = wx.StaticText(panel, label="List of drives and partitions")
         set_font(title, size=18, weight=wx.FONTWEIGHT_BOLD)
@@ -151,99 +162,49 @@ class DevicesWindow(wx.Frame):
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_FOCUSED, self.on_item_focused)
         self.list_ctrl.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_item_activated)
 
-        mount_info: dict[str, DiskSpaceInfo] = {}
-        df_lines = subprocess.check_output(["df"], universal_newlines=True).splitlines()
-        for line in df_lines:
-            if not line.startswith("/dev/disk"):
-                continue
-            identifier, size, used, free, _, _, _, _, mount_point = re.split(
-                r"\s+", line, maxsplit=8
-            )
-            short_identifier: str = identifier[5:]
-            mount_info[short_identifier] = DiskSpaceInfo(
-                identifier=identifier,
-                size=int(size) * 512,
-                used_space=int(used) * 512,
-                free_space=int(free) * 512,
-                mount_point=mount_point,
-            )
-
-        self.devices: List[DeviceInfo] = []
-
-        diskutil_list = subprocess.check_output(
-            ["diskutil", "list"], universal_newlines=True
-        )
-        stanzas = diskutil_list.strip().split("\n\n")
-        for stanza in stanzas:
-            self.devices.extend(self._parse_stanza(stanza, mount_info))
-
-        # Add columns to the list control
-        columns = [
+        # Add columns to the list control. "FileVault" is inserted between
+        # "Device status" and "Mount point" so that lock state is visible in
+        # the same row as the rest of the per-partition information.
+        self._columns = [
             "Identifier",
             "Type",
             "Name",
             "Size",
             "Device status",
+            "FileVault",
             "Mount point",
             "Used space",
         ]
 
-        for index, col in enumerate(columns):
+        for index, col in enumerate(self._columns):
             self.list_ctrl.InsertColumn(index, col, width=-1)
 
+        self.devices: List[DeviceInfo] = []
         self.selected_index = -1
 
-        highlight = wx.Colour()
-        highlight.SetRGBA(0x18808080)
-        for index, line in enumerate(self.devices):
-            mount_point = ""
-            size_str = line.size
-            used_str = ""
-            if line.type in ("APFS Volume", "APFS Snapshot"):
-                used_str = size_str
-                size_str = "^"
-            disk_space = line.disk_space
-            if disk_space:
-                mount_point = disk_space.mount_point
-                used_str = humanize.naturalsize(disk_space.used_space)
+        self._enumerate_devices()
+        self._populate_list()
 
-            index = self.list_ctrl.InsertItem(
-                index, f"{'  ' * line.indent}{line.identifier}"
-            )
-            self.list_ctrl.SetItem(index, 1, line.type)
-            self.list_ctrl.SetItem(index, 2, line.name)
-            self.list_ctrl.SetItem(index, 3, size_str)
-            self.list_ctrl.SetItem(index, 4, line.status)
-            self.list_ctrl.SetItem(index, 5, mount_point)
-            self.list_ctrl.SetItem(index, 6, used_str)
-            self.list_ctrl.SetItemData(index, index)
-            if f"{PARAMS.source}" == mount_point:
-                self.list_ctrl.Select(index)
-                self.list_ctrl.Focus(index)
-                self.selected_index = index
-            if index % 2:
-                self.list_ctrl.SetItemBackgroundColour(index, highlight)
-            if not mount_point:
-                self.list_ctrl.SetItemTextColour(index, (128, 128, 128))
-
+        # Compute a sensible minimum size based on the initial contents. This
+        # is done only once; _populate_list resizes columns on every refresh
+        # without altering the window minimum.
         padding = 10
         width = padding * 4
         height = padding * 4
-        for index in range(len(columns)):
-            self.list_ctrl.SetColumnWidth(index, wx.LIST_AUTOSIZE)
-            # Add a bit of padding
-            padded_width = self.list_ctrl.GetColumnWidth(index) + padding
-            padded_width = max(padded_width, 100)
-            if index == 2:
-                padded_width = min(padded_width, 180)
-            self.list_ctrl.SetColumnWidth(index, padded_width)
-            width = width + padded_width
-
-        for index in range((self.list_ctrl.ItemCount)):
+        for index in range(len(self._columns)):
+            width = width + self.list_ctrl.GetColumnWidth(index)
+        for index in range(self.list_ctrl.ItemCount):
             rect: wx.Rect = self.list_ctrl.GetItemRect(index)
             height = height + rect.GetHeight()
 
         self.list_ctrl.SetMinSize(wx.Size(width, height))
+
+        # Unlock button for FileVault-encrypted volumes. This is the only
+        # affordance for bringing a locked APFS volume online; the existing
+        # double-click flow intentionally refuses unmounted volumes.
+        self.unlock_btn = wx.Button(panel, label="Unlock FileVault volume\u2026")
+        self.unlock_btn.Bind(wx.EVT_BUTTON, self.on_unlock_filevault)
+        self._refresh_unlock_button_state()
 
         # Add controls to the sizer
         vbox = wx.BoxSizer(wx.VERTICAL)
@@ -251,6 +212,7 @@ class DevicesWindow(wx.Frame):
         vbox.Add(devices_label, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.TOP, 10)
         vbox.Add((0, 10))
         vbox.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, border=10)
+        vbox.Add(self.unlock_btn, 0, wx.ALIGN_CENTER_HORIZONTAL | wx.BOTTOM, 10)
         panel.SetSizerAndFit(vbox)
 
         sizer = wx.GridSizer(1)
@@ -273,6 +235,11 @@ class DevicesWindow(wx.Frame):
         device: DeviceInfo = self.devices[index]
         if device.disk_space and device.disk_space.mount_point:
             self.selected_index = event.GetIndex()
+        elif device.is_locked:
+            # Allow focusing locked FileVault volumes so the examiner can
+            # highlight them and use "Unlock FileVault volume…" or
+            # double-click to trigger the unlock dialog directly.
+            self.selected_index = event.GetIndex()
         else:
             self._back_to_selected()
 
@@ -292,8 +259,304 @@ class DevicesWindow(wx.Frame):
                 wx.EVT_LIST_ITEM_ACTIVATED, handler=self.on_item_activated
             )
             self.Close()
+        elif device.is_locked:
+            # Double-clicking a locked FileVault volume launches the unlock
+            # dialog pre-aimed at that specific volume.
+            self._run_unlock_dialog(preferred_identifier=device.identifier)
         else:
             self._back_to_selected()
+
+    def _enumerate_devices(self) -> None:
+        """Re-read disk state and rebuild ``self.devices``.
+
+        Called on window creation and again after a successful FileVault
+        unlock so the newly-mounted volume appears in the list.
+        """
+        mount_info: dict[str, DiskSpaceInfo] = {}
+        df_lines = subprocess.check_output(
+            ["df"], universal_newlines=True
+        ).splitlines()
+        for line in df_lines:
+            if not line.startswith("/dev/disk"):
+                continue
+            identifier, size, used, free, _, _, _, _, mount_point = re.split(
+                r"\s+", line, maxsplit=8
+            )
+            short_identifier: str = identifier[5:]
+            mount_info[short_identifier] = DiskSpaceInfo(
+                identifier=identifier,
+                size=int(size) * 512,
+                used_space=int(used) * 512,
+                free_space=int(free) * 512,
+                mount_point=mount_point,
+            )
+
+        self.devices = []
+        diskutil_list = subprocess.check_output(
+            ["diskutil", "list"], universal_newlines=True
+        )
+        stanzas = diskutil_list.strip().split("\n\n")
+        for stanza in stanzas:
+            self.devices.extend(self._parse_stanza(stanza, mount_info))
+
+        # Overlay FileVault / encryption state from ``diskutil apfs list``.
+        # If the lookup fails for any reason, the overlay is silently skipped
+        # and the UI degrades to the pre-FileVault behaviour.
+        try:
+            encrypted_map = {
+                v.identifier: v for v in list_encrypted_volumes()
+            }
+        except Exception:
+            encrypted_map = {}
+
+        for device in self.devices:
+            enc = encrypted_map.get(device.identifier)
+            if enc is not None:
+                device.filevault_status = enc.display_status
+                device.is_locked = enc.locked
+
+    def _populate_list(self) -> None:
+        """Fill the list control from ``self.devices``.
+
+        Clears any existing rows first so this method can be used for the
+        initial populate and for post-unlock refreshes.
+        """
+        self.list_ctrl.DeleteAllItems()
+        self.selected_index = -1
+
+        highlight = wx.Colour()
+        highlight.SetRGBA(0x18808080)
+
+        locked_colour = wx.Colour(181, 78, 78)  # matches ACCENT_COLOR
+
+        for index, line in enumerate(self.devices):
+            mount_point = ""
+            size_str = line.size
+            used_str = ""
+            if line.type in ("APFS Volume", "APFS Snapshot"):
+                used_str = size_str
+                size_str = "^"
+            disk_space = line.disk_space
+            if disk_space:
+                mount_point = disk_space.mount_point
+                used_str = humanize.naturalsize(disk_space.used_space)
+
+            index = self.list_ctrl.InsertItem(
+                index, f"{'  ' * line.indent}{line.identifier}"
+            )
+            self.list_ctrl.SetItem(index, 1, line.type)
+            self.list_ctrl.SetItem(index, 2, line.name)
+            self.list_ctrl.SetItem(index, 3, size_str)
+            self.list_ctrl.SetItem(index, 4, line.status)
+            self.list_ctrl.SetItem(index, 5, line.filevault_status)
+            self.list_ctrl.SetItem(index, 6, mount_point)
+            self.list_ctrl.SetItem(index, 7, used_str)
+            self.list_ctrl.SetItemData(index, index)
+            if f"{PARAMS.source}" == mount_point:
+                self.list_ctrl.Select(index)
+                self.list_ctrl.Focus(index)
+                self.selected_index = index
+            if index % 2:
+                self.list_ctrl.SetItemBackgroundColour(index, highlight)
+            if line.is_locked:
+                # Locked FileVault volumes stand out so the examiner knows
+                # an unlock step is required before selection.
+                self.list_ctrl.SetItemTextColour(index, locked_colour)
+            elif not mount_point:
+                self.list_ctrl.SetItemTextColour(index, (128, 128, 128))
+
+        padding = 10
+        for col_index in range(len(self._columns)):
+            self.list_ctrl.SetColumnWidth(col_index, wx.LIST_AUTOSIZE)
+            padded_width = self.list_ctrl.GetColumnWidth(col_index) + padding
+            padded_width = max(padded_width, 100)
+            if col_index == 2:
+                padded_width = min(padded_width, 180)
+            self.list_ctrl.SetColumnWidth(col_index, padded_width)
+
+    def _refresh_unlock_button_state(self) -> None:
+        """Enable the unlock button only when at least one volume is locked."""
+        has_locked = any(d.is_locked for d in self.devices)
+        self.unlock_btn.Enable(has_locked)
+        if has_locked:
+            self.unlock_btn.SetToolTip(
+                "Unlock a FileVault-encrypted volume and mount it read-only"
+            )
+        else:
+            self.unlock_btn.SetToolTip("No locked FileVault volumes detected")
+
+    def _run_unlock_dialog(self, preferred_identifier: str = "") -> None:
+        """Show the FileVault unlock dialog and process the result.
+
+        If *preferred_identifier* is provided (e.g. from a double-click on a
+        specific locked row), that volume is moved to the front of the choice
+        list so it is pre-selected in the dialog. The examiner can still pick a
+        different volume from the drop-down if needed.
+
+        The unlocked volume is mounted read-only; the device list is then
+        re-enumerated so the new mount point appears. The examiner still has to
+        explicitly double-click the newly mounted volume to set it as the
+        acquisition source, matching the existing UI contract.
+        """
+        # FileVaultUnlockDialog expects EncryptedVolume objects (which carry
+        # .roles, .name, .is_user_data).  self.devices holds DeviceInfo objects
+        # that only carry .is_locked as a flag — passing those caused an
+        # AttributeError on .roles before the dialog could appear.
+        try:
+            locked = [v for v in list_encrypted_volumes() if v.locked]
+        except Exception:
+            locked = []
+
+        if not locked:
+            wx.MessageBox(
+                "No locked FileVault volumes are currently visible.",
+                "Nothing to unlock",
+                wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+
+        if preferred_identifier:
+            # Move the preferred volume to the front so it is pre-selected.
+            locked = sorted(
+                locked, key=lambda v: v.identifier != preferred_identifier
+            )
+
+        dialog = FileVaultUnlockDialog(self, locked)
+        try:
+            if dialog.ShowModal() != wx.ID_OK:
+                return
+            identifier = dialog.get_identifier()
+            password = dialog.get_password()
+        finally:
+            dialog.Destroy()
+
+        if not identifier or password is None:
+            return
+
+        try:
+            mount_point = unlock_volume_readonly(identifier, password)
+        except UnlockError as exc:
+            wx.MessageBox(
+                f"{exc}",
+                "Unlock failed",
+                wx.OK | wx.ICON_ERROR,
+            )
+            return
+        finally:
+            # Drop our reference to the password as early as possible. Python
+            # strings are immutable, so this does not zero memory, but it
+            # does remove the only live reference from our side.
+            password = None  # noqa: F841
+
+        wx.MessageBox(
+            f"Volume unlocked and mounted READ-ONLY at:\n\n{mount_point}\n\n"
+            "Select it from the list to use it as the acquisition source.",
+            "Unlock successful",
+            wx.OK | wx.ICON_INFORMATION,
+        )
+
+        # Refresh the device list so the new mount appears.
+        self._enumerate_devices()
+        self._populate_list()
+        self._refresh_unlock_button_state()
+
+    def on_unlock_filevault(self, event):
+        """Button handler: open the unlock dialog with no volume pre-selected."""
+        self._run_unlock_dialog()
+
+
+class FileVaultUnlockDialog(wx.Dialog):
+    """Modal dialog: pick a locked volume, enter its FileVault password.
+
+    The password field uses ``wx.TE_PASSWORD`` so characters are masked.
+    A read-only notice is displayed prominently; this dialog has no option
+    to choose a writable mount because the forensic contract forbids it.
+    """
+
+    def __init__(self, parent, locked_volumes: List[EncryptedVolume]):
+        super().__init__(
+            parent,
+            title="Unlock FileVault volume",
+            style=wx.DEFAULT_DIALOG_STYLE,
+        )
+        self._locked = locked_volumes
+
+        panel = wx.Panel(self)
+
+        intro = wx.StaticText(
+            panel,
+            label=(
+                "The selected volume will be unlocked and mounted "
+                "READ-ONLY.\nThe password is sent to diskutil via stdin "
+                "and is never stored or logged."
+            ),
+        )
+
+        volume_label = wx.StaticText(panel, label="Locked volume:")
+        choices = [self._format_choice(v) for v in self._locked]
+        self._choice = wx.Choice(panel, choices=choices)
+        if choices:
+            # Prefer the Data role volume if present, otherwise the first entry.
+            default_index = next(
+                (i for i, v in enumerate(self._locked) if v.is_user_data),
+                0,
+            )
+            self._choice.SetSelection(default_index)
+
+        password_label = wx.StaticText(panel, label="FileVault password:")
+        self._password_text = wx.TextCtrl(
+            panel, style=wx.TE_PASSWORD | wx.TE_PROCESS_ENTER
+        )
+        self._password_text.Bind(wx.EVT_TEXT_ENTER, self._on_enter)
+
+        ok_btn = wx.Button(panel, wx.ID_OK, label="Unlock")
+        ok_btn.SetDefault()
+        cancel_btn = wx.Button(panel, wx.ID_CANCEL, label="Cancel")
+
+        # Layout
+        grid = wx.FlexGridSizer(cols=2, hgap=10, vgap=10)
+        grid.AddGrowableCol(1, 1)
+        grid.Add(volume_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        grid.Add(self._choice, 1, wx.EXPAND)
+        grid.Add(password_label, 0, wx.ALIGN_CENTER_VERTICAL)
+        grid.Add(self._password_text, 1, wx.EXPAND)
+
+        btn_box = wx.BoxSizer(wx.HORIZONTAL)
+        btn_box.Add(cancel_btn, 0, wx.RIGHT, 10)
+        btn_box.Add(ok_btn, 0)
+
+        vbox = wx.BoxSizer(wx.VERTICAL)
+        vbox.Add(intro, 0, wx.ALL, 15)
+        vbox.Add(grid, 0, wx.EXPAND | wx.ALL, 15)
+        vbox.Add(btn_box, 0, wx.ALIGN_RIGHT | wx.ALL, 15)
+
+        panel.SetSizerAndFit(vbox)
+        outer = wx.BoxSizer(wx.VERTICAL)
+        outer.Add(panel, 1, wx.EXPAND)
+        self.SetSizerAndFit(outer)
+        self.Center()
+
+        self._password_text.SetFocus()
+
+    @staticmethod
+    def _format_choice(v: EncryptedVolume) -> str:
+        role = ", ".join(v.roles) if v.roles else "no role"
+        name = v.name or "(unnamed)"
+        return f"{v.identifier}  —  {name}  [{role}]"
+
+    def _on_enter(self, event):
+        # Enter in the password field submits the dialog.
+        if self.IsModal():
+            self.EndModal(wx.ID_OK)
+
+    def get_identifier(self) -> str:
+        index = self._choice.GetSelection()
+        if index < 0 or index >= len(self._locked):
+            return ""
+        return self._locked[index].identifier
+
+    def get_password(self) -> Optional[str]:
+        return self._password_text.GetValue()
 
 
 class InputWindow(wx.Frame):
