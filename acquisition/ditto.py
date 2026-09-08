@@ -2,6 +2,7 @@ from datetime import datetime
 
 from acquisition.abstract import AcquisitionMethod, Parameters, Report
 from shared.environment import RECOVERY
+from shared.fifos import keep_fifos_open
 
 
 class DittoMethod(AcquisitionMethod):
@@ -28,7 +29,8 @@ class DittoMethod(AcquisitionMethod):
         if not source_str.endswith("/"):
             source_str = source_str + "/"
         command = ["ditto", "-X", "-V", source_str, temporary_image.mount]
-        status = self._run_status(command)
+        with keep_fifos_open(params.source):
+            status = self._run_status(command)
 
         # We cannot rely on the exit code, because it will probably contain some
         # errors if a few files cannot be copied.
