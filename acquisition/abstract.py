@@ -16,6 +16,7 @@ from subprocess import Popen
 from typing import IO, List, Optional, Tuple
 
 from meta import AUTHOR, VERSION
+from shared import diskimage
 from shared.environment import RECOVERY, SOURCE_PATH
 from shared.utils import datetime_string, lines_to_properties
 
@@ -284,26 +285,20 @@ class AcquisitionMethod(ABC):
         # Add a bit of extra space to ensure the destination is large enough
         extra_gigabyte_sectors = 2 * 10**6
         sectors = report.path_details.disk_sectors + extra_gigabyte_sectors
-        temporary_path = output_directory / f"{params.image_name}{suffix}.sparseimage"
+        temporary_path = (
+            output_directory
+            / f"{params.image_name}{suffix}{diskimage.sparse_extension()}"
+        )
 
-        image_path: str = f"{temporary_path}"
         result, output = self._run_process(
-            [
-                "hdiutil",
-                "create",
-                "-sectors",
-                f"{sectors}",
-                "-fs",
-                best_filesystem,
-                "-volname",
-                params.image_name,
-                image_path,
-            ],
+            diskimage.create_sparse_command(
+                temporary_path, sectors * 512, best_filesystem, params.image_name
+            )
         )
         if result > 0:
             return None
 
-        result, output = self._run_process(["hdiutil", "attach", image_path])
+        result, output = self._run_process(diskimage.attach_command(temporary_path))
         output_lines = output.strip().splitlines()
 
         container_lines = [
@@ -357,7 +352,7 @@ class AcquisitionMethod(ABC):
 
         i = 1
         while True:
-            result = self._run_status(["hdiutil", "detach", image.volume])
+            result = self._run_status(diskimage.detach_volume_command(image.volume))
             if result == 0:
                 break
             i = i + 1
@@ -367,7 +362,7 @@ class AcquisitionMethod(ABC):
             time.sleep(interval)
 
         # This could be automatically unmounted, we don't check for success
-        self._run_silent(["hdiutil", "detach", "-force", image.container])
+        self._run_silent(diskimage.detach_container_command(image.container))
         return True
 
     def _start_coffee(self) -> Popen:
@@ -399,10 +394,8 @@ class AcquisitionMethod(ABC):
 
         temporary_output_path = Path(conversion_image.mount) / final_image_name
         print("\nConverting", self.temporary_image.path, "->", temporary_output_path)
-        sparseimage = f"{self.temporary_image.path}"
-        dmg = f"{temporary_output_path}"
         result = self._run_status(
-            ["hdiutil", "convert", sparseimage, "-format", "UDZO", "-o", dmg]
+            diskimage.convert_command(self.temporary_image.path, temporary_output_path)
         )
         success = result == 0
 
@@ -410,7 +403,7 @@ class AcquisitionMethod(ABC):
             return False
 
         # Remove the temporary image and free up space for the DMG
-        self.temporary_image.path.unlink(missing_ok=True)
+        diskimage.remove_image(self.temporary_image.path)
 
         # Copy file to final destination
         print("\nMoving", temporary_output_path, "->", self.output_path)
@@ -428,7 +421,7 @@ class AcquisitionMethod(ABC):
 
         detach_result = self._detach_sparse_image(conversion_image)
         # Try to remove the conversion image directory, if empty
-        conversion_image.path.unlink(missing_ok=True)
+        diskimage.remove_image(conversion_image.path)
         try:
             conversion_image.path.parent.rmdir()
         except Exception:
@@ -465,7 +458,7 @@ class AcquisitionMethod(ABC):
 
         detach_result = self._detach_sparse_image(self.temporary_image)
         # Try to remove the temporary image directory, if empty
-        self.temporary_image.path.unlink(missing_ok=True)
+        diskimage.remove_image(self.temporary_image.path)
         try:
             self.temporary_image.path.parent.rmdir()
         except Exception:
@@ -554,6 +547,8 @@ class AcquisitionMethod(ABC):
                     f"Source: {report.parameters.source}",
                     f"Acquisition method: {report.method.name}",
                     f"Running in recovery environment: {'Yes' if RECOVERY else 'No'}",
+                    f"macOS version: {diskimage.macos_version_string()}",
+                    f"Disk image tool: {diskimage.tool_name()}",
                     separator,
                     report.hardware_info,
                     separator,

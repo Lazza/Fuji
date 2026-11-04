@@ -9,6 +9,7 @@ import wx.lib.agw.hyperlink as hl
 
 from meta import RAMDISK_NAME, VOLUME_NAME
 
+from .diskimage import first_device, ramdisk_attach_command
 from .utils import command_to_properties
 
 RECOVERY: bool = bool(os.getenv("__OSINSTALL_ENVIRONMENT", ""))
@@ -77,12 +78,17 @@ def attempt_ramdisk() -> None:
     sectors = 256 * 1024 * 1024 // 512
     try:
         attach_result = subprocess.run(
-            ["hdiutil", "attach", "-nomount", f"ram://{sectors}"],
+            ramdisk_attach_command(sectors),
             capture_output=True,
             text=True,
             check=True,
         )
-        ramdisk_device = attach_result.stdout.strip()
+        # stdout may contain a deprecation warning, so pick the device node
+        # explicitly instead of taking the whole output.
+        ramdisk_device = first_device(attach_result.stdout + attach_result.stderr)
+        if not ramdisk_device:
+            print("Error: RAM disk device not found.")
+            return
 
         # Format the RAM disk
         subprocess.run(
