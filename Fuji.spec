@@ -11,6 +11,13 @@ import dmgbuild
 
 sys.path.insert(0, ".")
 meta = importlib.import_module("meta")
+diskimage = importlib.import_module("shared.diskimage")
+
+# The build machine decides: hdiutil up to macOS 26, diskutil image from 27
+print(
+    f"Build on macOS {diskimage.macos_version_string()}, "
+    f"disk image tool: {diskimage.tool_name()}"
+)
 
 
 a = Analysis( # type: ignore
@@ -90,8 +97,10 @@ except Exception as e:
 print("Exporting final DMG", dmg_path)
 
 # Attach temporary image and get mount point
-attach_process = subprocess.Popen(
-    [
+if diskimage.use_diskutil_image():
+    attach_command = ["diskutil", "image", "attach", "--nobrowse", temp_dmg_path]
+else:
+    attach_command = [
         "hdiutil",
         "attach",
         "-nobrowse",
@@ -100,7 +109,9 @@ attach_process = subprocess.Popen(
         "-owners",
         "off",
         temp_dmg_path,
-    ],
+    ]
+attach_process = subprocess.Popen(
+    attach_command,
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
 )
@@ -121,24 +132,22 @@ if mount_point:
     subprocess.call(["chmod", "-R", "a-w", mount_point])
 
     # Detach the mounted image
-    subprocess.call(["hdiutil", "detach", mount_point])
+    if diskimage.use_diskutil_image():
+        subprocess.call(["diskutil", "eject", mount_point])
+    else:
+        subprocess.call(["hdiutil", "detach", mount_point])
 else:
     print("Mount point not found.")
     sys.exit(1)
 
-# Convert to zlib-compressed image
-subprocess.call(
-    [
-        "hdiutil",
-        "convert",
-        temp_dmg_path,
-        "-format",
-        "UDZO",
-        "-ov",
-        "-o",
-        dmg_path,
-    ]
+# Convert to zlib-compressed image (remove an old one, like "-ov" did)
+Path(dmg_path).unlink(missing_ok=True)
+result = subprocess.call(
+    diskimage.convert_command(Path(temp_dmg_path), Path(dmg_path), "UDZO")
 )
+if result != 0:
+    print("DMG conversion failed")
+    sys.exit(1)
 remove(temp_dmg_path)
 
 print("Done!")
