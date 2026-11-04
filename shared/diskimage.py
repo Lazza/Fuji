@@ -136,10 +136,11 @@ def detach_volume_command(volume_device: str) -> List[str]:
 
 
 def detach_container_command(container_device: str) -> List[str]:
-    # Second step: release the whole image. `diskutil image` has no detach,
-    # the replacement is the top-level `diskutil eject`.
+    # Second step: release the whole image. `diskutil image` has no detach.
+    # On macOS 27 hdiutil itself recommends `diskutil eject force` as the
+    # replacement for `hdiutil detach -force`.
     if use_diskutil_image():
-        return ["diskutil", "eject", container_device]
+        return ["diskutil", "eject", "force", container_device]
     return ["hdiutil", "detach", "-force", container_device]
 
 
