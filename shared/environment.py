@@ -9,6 +9,7 @@ import wx.lib.agw.hyperlink as hl
 
 from meta import RAMDISK_NAME, VOLUME_NAME
 
+from . import filevault
 from .utils import command_to_properties
 
 RECOVERY: bool = bool(os.getenv("__OSINSTALL_ENVIRONMENT", ""))
@@ -35,6 +36,14 @@ if RECOVERY:
         if path.startswith(OS_ROOT) and os.path.exists(data_canary_path):
             SOURCE_PATH = path
             break
+    # Fallback: the data volume may be mounted under a different name (e.g.
+    # "/Volumes/Data" next to "/Volumes/Macintosh HD"), so look it up by its
+    # APFS "Data" role instead.
+    if SOURCE_PATH == "/":
+        for volume in filevault.data_volumes():
+            if volume.mounted:
+                SOURCE_PATH = volume.mount_point
+                break
 else:
     data_path = "/System/Volumes/Data"
     data_canary_path = os.path.join(data_path, ".fseventsd")
