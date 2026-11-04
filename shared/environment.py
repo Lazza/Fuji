@@ -128,18 +128,25 @@ def attempt_ramdisk() -> None:
             f"exec >> {quoted_log} 2>&1; "
             f"echo \"[$(date)] Switching {source_fujiapp} to {ramdisk}\"; "
             f"sleep 2; "
-            f"hdiutil detach -force {quoted_source_fujiapp} "
+            # "diskutil eject force" is recommended on macOS 27, where
+            # "hdiutil detach -force" is deprecated; older tools as fallback
+            f"diskutil eject force {quoted_source_fujiapp} "
+            f"|| hdiutil detach -force {quoted_source_fujiapp} "
             f"|| diskutil unmount force {quoted_source_fujiapp}; "
             f"echo \"detach exit code: $?\"; "
             # Wait until the volume is really unmounted (up to 10 seconds)
             f"for i in 1 2 3 4 5 6 7 8 9 10; do "
             f"mount | grep -q \" on {source_fujiapp.as_posix()} (\" || break; "
             f"sleep 1; done; "
+            # Only link if the volume is really gone, otherwise ln would put
+            # the link inside the still mounted volume
+            f"if mount | grep -q \" on {source_fujiapp.as_posix()} (\"; then "
+            f"echo \"volume still mounted, no symlink created\"; else "
             # Remove a leftover empty mount point directory
             f"if [ -d {quoted_source_fujiapp} ] && [ ! -L {quoted_source_fujiapp} ]; "
             f"then rmdir {quoted_source_fujiapp}; fi; "
             f"ln -sfn {quoted_ramdisk} {quoted_source_fujiapp}; "
-            f"echo \"ln exit code: $?\"; "
+            f"echo \"ln exit code: $?\"; fi; "
             f"ls -la /Volumes/"
         )
 
