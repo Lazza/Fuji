@@ -63,6 +63,9 @@ def current_volume() -> str:
     return components[2]
 
 
+RAMDISK_LOG = "/tmp/fuji-ramdisk.log"
+
+
 def attempt_ramdisk() -> None:
     volume = current_volume()
     if volume.startswith(RAMDISK_NAME):
@@ -115,10 +118,29 @@ def attempt_ramdisk() -> None:
         quoted_source_fujiapp = shlex.quote(source_fujiapp.as_posix())
         quoted_ramdisk = shlex.quote(ramdisk.as_posix())
 
+        # The symlink keeps the original path (used e.g. by the app list of
+        # the recovery environment) working after the volume is detached.
+        # The steps are not chained with "&&": the link must be created as
+        # soon as the volume is gone, even if detach reports an error.
+        # Output goes to a log file, so failures can be analyzed.
+        quoted_log = shlex.quote(RAMDISK_LOG)
         shell_command = (
-            f"sleep 2 && "  # Delay for 2 seconds
-            f"hdiutil detach -force {quoted_source_fujiapp} && "  # Detach
-            f"ln -s {quoted_ramdisk} {quoted_source_fujiapp}"  # Create symlink
+            f"exec >> {quoted_log} 2>&1; "
+            f"echo \"[$(date)] Switching {source_fujiapp} to {ramdisk}\"; "
+            f"sleep 2; "
+            f"hdiutil detach -force {quoted_source_fujiapp} "
+            f"|| diskutil unmount force {quoted_source_fujiapp}; "
+            f"echo \"detach exit code: $?\"; "
+            # Wait until the volume is really unmounted (up to 10 seconds)
+            f"for i in 1 2 3 4 5 6 7 8 9 10; do "
+            f"mount | grep -q \" on {source_fujiapp.as_posix()} (\" || break; "
+            f"sleep 1; done; "
+            # Remove a leftover empty mount point directory
+            f"if [ -d {quoted_source_fujiapp} ] && [ ! -L {quoted_source_fujiapp} ]; "
+            f"then rmdir {quoted_source_fujiapp}; fi; "
+            f"ln -sfn {quoted_ramdisk} {quoted_source_fujiapp}; "
+            f"echo \"ln exit code: $?\"; "
+            f"ls -la /Volumes/"
         )
 
         subprocess.Popen(
