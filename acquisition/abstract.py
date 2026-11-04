@@ -548,7 +548,6 @@ class AcquisitionMethod(ABC):
                     f"Acquisition method: {report.method.name}",
                     f"Running in recovery environment: {'Yes' if RECOVERY else 'No'}",
                     f"macOS version: {diskimage.macos_version_string()}",
-                    f"Disk image tool: {diskimage.tool_name()}",
                     separator,
                     report.hardware_info,
                     separator,
