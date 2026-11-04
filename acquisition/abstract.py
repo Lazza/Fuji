@@ -60,6 +60,8 @@ class Report:
     end_time: Optional[datetime] = None
     path_details: PathDetails = None  # type: ignore
     hardware_info: str = ""
+    layout_info: str = ""
+    exclusions: List[Path] = field(default_factory=list)
     success: bool = False
     output_files: List[Path] = field(default_factory=list)
     result: HashedFile = None  # type: ignore
@@ -269,6 +271,36 @@ class AcquisitionMethod(ABC):
             ]
         )
         return hardware_info
+
+    def _gather_layout_info(self) -> str:
+        # Document how the volumes are combined, so the report explains where
+        # the acquired files physically come from.
+        if RECOVERY:
+            return (
+                "Firmlinks: not active (recovery environment), "
+                "the source is read directly from its own volume"
+            )
+
+        lines = ["Firmlinks (path -> location on the data volume):", ""]
+        try:
+            content = Path("/usr/share/firmlinks").read_text()
+            for entry in content.splitlines():
+                parts = entry.strip().split("\t")
+                if len(parts) == 2:
+                    lines.append(
+                        f"    {parts[0]} -> /System/Volumes/Data/{parts[1]}"
+                    )
+                elif entry.strip():
+                    lines.append(f"    {entry.strip()}")
+        except Exception as e:
+            lines.append(f"    Could not read /usr/share/firmlinks: {e}")
+
+        data_volume = "/System/Volumes/Data"
+        if os.path.ismount(data_volume):
+            _, data_info = self._run_silent(["diskutil", "info", data_volume])
+            lines += ["", "Data volume:", "", data_info.strip("\n")]
+
+        return "\n".join(lines)
 
     def _create_sparse_image(
         self, report: Report, base: Path, suffix: str = ""
@@ -528,6 +560,13 @@ class AcquisitionMethod(ABC):
                 "Generated artifacts (including temporary ones):",
             ] + [f"    - {file}" for file in report.output_files]
 
+        exclusions = []
+        if len(report.exclusions):
+            exclusions = [
+                separator,
+                "Excluded paths (avoid acquiring the same files twice):",
+            ] + [f"    - {path}" for path in report.exclusions]
+
         hashes = []
         if report.result:
             hashes = [
@@ -560,7 +599,10 @@ class AcquisitionMethod(ABC):
                     "Volume:",
                     "",
                     report.path_details.disk_info,
+                    separator,
+                    report.layout_info,
                 ]
+                + exclusions
                 + output_files
                 + hashes
             ):
@@ -570,6 +612,7 @@ class AcquisitionMethod(ABC):
         report = Report(params, self, start_time=datetime.now())
         report.path_details = self._gather_path_info(params.source)
         report.hardware_info = self._gather_hardware_info()
+        report.layout_info = self._gather_layout_info()
         # Preliminary report
         self._write_report(report)
         return report

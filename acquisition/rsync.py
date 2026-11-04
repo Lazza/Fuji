@@ -45,6 +45,7 @@ class RsyncMethod(AcquisitionMethod):
 
         print("Computing exclusions...")
         exclusions = self._compute_exclusions(params)
+        report.exclusions = exclusions
 
         temporary_image = self._create_temporary_image(report)
         if not temporary_image:
