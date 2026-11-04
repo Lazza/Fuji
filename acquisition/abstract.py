@@ -16,6 +16,7 @@ from subprocess import Popen
 from typing import IO, List, Optional, Tuple
 
 from meta import AUTHOR, VERSION
+from shared import session
 from shared.environment import RECOVERY, SOURCE_PATH
 from shared.utils import datetime_string, lines_to_properties
 
@@ -528,6 +529,14 @@ class AcquisitionMethod(ABC):
                 "Generated artifacts (including temporary ones):",
             ] + [f"    - {file}" for file in report.output_files]
 
+        terminal = []
+        if len(session.TERMINAL_OPENED):
+            terminal = [
+                separator,
+                "Terminal opened from Fuji during this session "
+                "(commands are not logged):",
+            ] + [f"    - {datetime_string(t)}" for t in session.TERMINAL_OPENED]
+
         hashes = []
         if report.result:
             hashes = [
@@ -561,6 +570,7 @@ class AcquisitionMethod(ABC):
                     "",
                     report.path_details.disk_info,
                 ]
+                + terminal
                 + output_files
                 + hashes
             ):

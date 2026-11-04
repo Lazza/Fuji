@@ -23,7 +23,9 @@ from checks.name import NameCheck
 from checks.network import NetworkCheck
 from checks.running_apps import RunningAppsCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
+from shared import session
 from shared.environment import RECOVERY, AdaptiveHyperLinkCtrl, attempt_ramdisk
+from shared.terminal import open_terminal
 from shared.utils import (
     ACCENT_COLOR,
     GREEN_COLOR,
@@ -341,6 +343,9 @@ class InputWindow(wx.Frame):
         # Add Devices button
         devices_button = wx.Button(panel, label="List of drives and partitions")
         devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
+        # Add terminal button (recovery only)
+        terminal_button = wx.Button(panel, label="Open Terminal")
+        terminal_button.Bind(wx.EVT_BUTTON, self.on_open_terminal)
         tmp_label = wx.StaticText(panel, label="Temporary files:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
@@ -403,6 +408,11 @@ class InputWindow(wx.Frame):
         output_info.Add(self.source_picker, 1, wx.EXPAND)
         output_info.Add((0, 0))
         output_info.Add(devices_button, 0, wx.EXPAND)
+        if RECOVERY:
+            output_info.Add((0, 0))
+            output_info.Add(terminal_button, 0, wx.EXPAND)
+        else:
+            terminal_button.Hide()
         output_info.Add(destination_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.destination_picker, 1, wx.EXPAND)
         output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
@@ -437,6 +447,28 @@ class InputWindow(wx.Frame):
         menu_bar = wx.MenuBar()
         self.SetMenuBar(menu_bar)
         self.Bind(wx.EVT_CLOSE, self.on_quit)
+
+    def on_open_terminal(self, event):
+        answer = wx.MessageBox(
+            "A Terminal window with root privileges will be opened.\n\n"
+            "Commands run in this terminal are not logged by Fuji and may "
+            "modify the source. The time of opening will be recorded in the "
+            "acquisition report.\n\nContinue?",
+            "Open Terminal",
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+        )
+        if answer != wx.YES:
+            return
+
+        ok, error = open_terminal()
+        if ok:
+            session.record_terminal_opened()
+        else:
+            wx.MessageBox(
+                f"The Terminal could not be opened:\n{error}",
+                "Open Terminal",
+                wx.OK | wx.ICON_ERROR,
+            )
 
     def on_open_devices(self, event):
         if self.devices_window is not None:
