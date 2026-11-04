@@ -17,13 +17,16 @@ from acquisition.ditto import DittoMethod
 from acquisition.rsync import RsyncMethod
 from acquisition.sysdiagnose import SysdiagnoseMethod
 from checks.abstract import Check
+from checks.data_volume import DataVolumeCheck
 from checks.folders import FoldersCheck
 from checks.free_space import FreeSpaceCheck
 from checks.name import NameCheck
 from checks.network import NetworkCheck
 from checks.running_apps import RunningAppsCheck
 from meta import AUTHOR, HOMEPAGE, VERSION
+from shared import filevault
 from shared.environment import RECOVERY, AdaptiveHyperLinkCtrl, attempt_ramdisk
+from shared.unlock_dialog import UnlockDialog
 from shared.utils import (
     ACCENT_COLOR,
     GREEN_COLOR,
@@ -43,6 +46,7 @@ ALL_METHODS: List[AcquisitionMethod] = [
 METHODS = [m for m in ALL_METHODS if m.available()]
 ALL_CHECKS: List[Check] = [
     NameCheck(),
+    DataVolumeCheck(),
     FoldersCheck(),
     FreeSpaceCheck(),
     NetworkCheck(),
@@ -341,6 +345,9 @@ class InputWindow(wx.Frame):
         # Add Devices button
         devices_button = wx.Button(panel, label="List of drives and partitions")
         devices_button.Bind(wx.EVT_BUTTON, self.on_open_devices)
+        # Add unlock button (recovery only)
+        unlock_button = wx.Button(panel, label="Unlock data volume")
+        unlock_button.Bind(wx.EVT_BUTTON, lambda e: self.open_unlock_dialog())
         tmp_label = wx.StaticText(panel, label="Temporary files:")
         self.tmp_picker = wx.DirPickerCtrl(panel)
         self.tmp_picker.SetInitialDirectory("/Volumes")
@@ -403,6 +410,11 @@ class InputWindow(wx.Frame):
         output_info.Add(self.source_picker, 1, wx.EXPAND)
         output_info.Add((0, 0))
         output_info.Add(devices_button, 0, wx.EXPAND)
+        if RECOVERY:
+            output_info.Add((0, 0))
+            output_info.Add(unlock_button, 0, wx.EXPAND)
+        else:
+            unlock_button.Hide()
         output_info.Add(destination_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
         output_info.Add(self.destination_picker, 1, wx.EXPAND)
         output_info.Add(tmp_label, 0, wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
@@ -451,6 +463,67 @@ class InputWindow(wx.Frame):
         if self.devices_window:
             self.devices_window.Destroy()
         self.devices_window = None
+
+    def _set_source(self, path: str):
+        PARAMS.source = Path(path)
+        self.source_picker.SetPath(path)
+
+    def open_unlock_dialog(self):
+        with wx.BusyCursor():
+            volumes = [v for v in filevault.data_volumes() if not v.mounted]
+        if not volumes:
+            wx.MessageBox(
+                "All macOS data volumes are already mounted.",
+                "Unlock data volume",
+                wx.OK | wx.ICON_INFORMATION,
+            )
+            return
+
+        dialog = UnlockDialog(self, volumes)
+        if dialog.ShowModal() == wx.ID_OK and dialog.mount_point:
+            self._set_source(dialog.mount_point)
+            wx.MessageBox(
+                f"Data volume mounted at:\n{dialog.mount_point}\n\n"
+                "It has been set as source location.",
+                "Unlock data volume",
+                wx.OK | wx.ICON_INFORMATION,
+            )
+        dialog.Destroy()
+
+    def check_data_volume(self):
+        # Called once at startup (recovery only)
+        if not RECOVERY:
+            return
+
+        with wx.BusyCursor():
+            volumes = filevault.data_volumes()
+        mounted = [v for v in volumes if v.mounted]
+        unmounted = [v for v in volumes if not v.mounted]
+
+        if mounted:
+            # Make sure the source points to the data volume, not to "/"
+            if PARAMS.source == Path("/"):
+                self._set_source(mounted[0].mount_point)
+            return
+
+        if not unmounted:
+            wx.MessageBox(
+                "No macOS data volume was found on this Mac.\n"
+                "Please check the list of drives and partitions.",
+                "No data volume",
+                wx.OK | wx.ICON_WARNING,
+            )
+            return
+
+        names = "\n".join(f"  - {v.label()}" for v in unmounted)
+        answer = wx.MessageBox(
+            "No macOS data volume is mounted, so the user data cannot be "
+            f"acquired.\n\nFound:\n{names}\n\nUnlock / mount it now?",
+            "Data volume not mounted",
+            wx.YES_NO | wx.ICON_WARNING,
+        )
+        if answer == wx.YES:
+            self.open_unlock_dialog()
 
     def on_destination_changed(self, event):
         destination_location = self.destination_picker.GetPath()
@@ -743,5 +816,6 @@ if __name__ == "__main__":
     PROCESSING_WINDOW = ProcessingWindow()
 
     INPUT_WINDOW.Show()
+    wx.CallAfter(INPUT_WINDOW.check_data_volume)
     app.MainLoop()
     app.Destroy()
